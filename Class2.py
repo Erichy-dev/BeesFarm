@@ -24,19 +24,60 @@ class Object:
             hive_width = self.beehive["width"]
             hive_height = self.beehive["height"]
             
-            for _ in range(count):
-                # Randomize positions a bit around the beehive center
-                offset_x = random.uniform(-0.5, 0.5)
-                offset_y = random.uniform(-0.5, 0.5)
-                dot_x = hive_x + hive_width / 2 + offset_x
-                dot_y = hive_y + hive_height / 2 + offset_y
+            # Calculate spawn regions within beehive
+            regions = []
+            if count <= 4:
+                # Divide beehive into regions based on count
+                region_width = hive_width / (count ** 0.5)
+                region_height = hive_height / (count ** 0.5)
+                
+                for i in range(min(2, count)):
+                    for j in range((count+1)//2):
+                        if len(regions) < count:
+                            region_x = hive_x + i * region_width
+                            region_y = hive_y + j * region_height
+                            regions.append((region_x, region_y, region_width, region_height))
+            
+            # If we couldn't create regions (shouldn't happen), fall back to default
+            if not regions:
+                regions = [(hive_x, hive_y, hive_width, hive_height)] * count
+                
+            # Place dots in different regions with some randomness
+            for i in range(count):
+                region_x, region_y, region_w, region_h = regions[i % len(regions)]
+                
+                # Add randomness within the region
+                offset_x = random.uniform(0.2, 0.8) * region_w
+                offset_y = random.uniform(0.2, 0.8) * region_h
+                
+                dot_x = region_x + offset_x
+                dot_y = region_y + offset_y
                 self.red_dots.append(CircleDot((dot_x, dot_y)))
         else:
-            # If no beehive, place dots randomly
+            # If no beehive, place dots with spacing across the grid
+            existing_positions = []
+            min_distance = 2.0  # Minimum distance between dots
+            
             for _ in range(count):
-                dot_x = random.uniform(0, self.block_size)
-                dot_y = random.uniform(0, self.block_size)
-                self.red_dots.append(CircleDot((dot_x, dot_y)))
+                attempts = 0
+                while attempts < 20:  # Limit attempts to prevent infinite loop
+                    dot_x = random.uniform(1, self.block_size-1)
+                    dot_y = random.uniform(1, self.block_size-1)
+                    
+                    # Check if this position is far enough from other dots
+                    if all(((x-dot_x)**2 + (y-dot_y)**2)**0.5 > min_distance 
+                          for x, y in existing_positions):
+                        existing_positions.append((dot_x, dot_y))
+                        self.red_dots.append(CircleDot((dot_x, dot_y)))
+                        break
+                    
+                    attempts += 1
+                
+                # If we couldn't find a good spot after max attempts, just place it
+                if attempts >= 20 and len(self.red_dots) < count:
+                    dot_x = random.uniform(1, self.block_size-1)
+                    dot_y = random.uniform(1, self.block_size-1)
+                    self.red_dots.append(CircleDot((dot_x, dot_y)))
 
     def add_red_dot(self):
         self.add_red_dots(1)
