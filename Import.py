@@ -88,8 +88,12 @@ def main():
         num_houses = int(input("How many houses do you want (1 to 4)? "))
         if not 1 <= num_houses <= 4:
             raise ValueError
+            
+        num_red_dots = int(input("How many worker bees (red dots) do you want (1 to 4)? "))
+        if not 1 <= num_red_dots <= 4:
+            raise ValueError
     except ValueError:
-        print("Invalid input. Please enter a number between 1 and 4.")
+        print("Invalid input. Please enter valid numbers as requested.")
         return
 
     # Create figure with grid layout for both visualizations
@@ -105,13 +109,13 @@ def main():
     # Setup objects in the environment
     landscape.objects.add_beehive(position=(11, 0), height=3, width=3)
     landscape.objects.add_pond(position=(12, 5), height=5, width=3)
-    landscape.objects.add_red_dot()
+    landscape.objects.add_red_dots(count=num_red_dots)  # Now using add_red_dots with count
     landscape.objects.add_gold_dots(count=5)
     landscape.objects.add_silver_dots()
 
     # Initialize movement logic with obstacle avoidance (pond + forbidden zone)
     landscape.movement = Move(
-        red_dot=landscape.objects.red_dot,
+        red_dots=landscape.objects.red_dots,  # Pass all red dots
         gold_dots=landscape.objects.gold_dots,
         beehive_position=(11, 2),
         max_gold_collected=landscape.max_gold_collected,
@@ -121,7 +125,7 @@ def main():
     )
 
     # Show simulation - modify to use our subplot
-    landscape.display(fig=fig, subplot_spec=gs[0, 1], title="15x15 Landscape with Beehive and Pond")
+    landscape.display(fig=fig, subplot_spec=gs[0, 1], title=f"Landscape with {num_red_dots} Worker Bees")
     
     # Display the combined figure
     plt.tight_layout()

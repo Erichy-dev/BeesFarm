@@ -127,10 +127,13 @@ class Landscape:
         forbidden_circle = plt.Circle((5.5, 8.5), 1.5, color='lightgreen', label='Forbidden Zone')
         ax.add_patch(forbidden_circle)
 
-        red_circle = None
-        if self.objects.red_dot:
-            red_circle = plt.Circle(self.objects.red_dot.position, radius=0.1, color='red', label="Red Dot")
+        # Create red dots (worker bees)
+        red_circles = []
+        for i, red_dot in enumerate(self.objects.red_dots):
+            label = "Worker Bee" if i == 0 else "_nolegend_"
+            red_circle = plt.Circle(red_dot.position, radius=0.1, color='red', label=label)
             ax.add_patch(red_circle)
+            red_circles.append(red_circle)
 
         for silver_dot in self.objects.silver_dots:
             ax.plot(silver_dot.position[0], silver_dot.position[1], 'o', color='silver', markersize=5, label="Silver Dot")
@@ -161,12 +164,19 @@ class Landscape:
 
             if self.movement:
                 self.movement.update_state()
-                if red_circle:
-                    red_circle.center = self.objects.red_dot.position
+                
+                # Update all red dot positions
+                for i, red_dot in enumerate(self.objects.red_dots):
+                    if i < len(red_circles):
+                        red_circles[i].center = red_dot.position
+                
+                # Update gold dot positions
                 for i, gold_dot in enumerate(self.objects.gold_dots):
-                    gold_circles[i].center = gold_dot.position
+                    if i < len(gold_circles):
+                        gold_circles[i].center = gold_dot.position
+                
                 gold_text.set_text(f'Nectar Collected: {self.movement.gold_collected}/{self.max_gold_collected}')
-                return red_circle, *gold_circles, gold_text
+                return *red_circles, *gold_circles, gold_text
 
         ani = animation.FuncAnimation(fig, update, frames=1000, blit=True, interval=200)
         # Store animation reference to prevent garbage collection

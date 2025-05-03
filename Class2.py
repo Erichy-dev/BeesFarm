@@ -10,7 +10,7 @@ class Object:
         self.block_size = block_size
         self.beehive = None
         self.silver_dots = []
-        self.red_dot = None
+        self.red_dots = []
         self.gold_dots = []
         self.spawn = spawn
         self.pond = None
@@ -18,17 +18,29 @@ class Object:
     def add_beehive(self, position=(5, 5), height=2, width=3):
         self.beehive = {"position": position, "height": height, "width": width}
 
-    def add_red_dot(self):
+    def add_red_dots(self, count=1):
         if self.beehive:
             hive_x, hive_y = self.beehive["position"]
             hive_width = self.beehive["width"]
             hive_height = self.beehive["height"]
-            dot_x = hive_x + hive_width / 2
-            dot_y = hive_y + hive_height / 2
+            
+            for _ in range(count):
+                # Randomize positions a bit around the beehive center
+                offset_x = random.uniform(-0.5, 0.5)
+                offset_y = random.uniform(-0.5, 0.5)
+                dot_x = hive_x + hive_width / 2 + offset_x
+                dot_y = hive_y + hive_height / 2 + offset_y
+                self.red_dots.append(CircleDot((dot_x, dot_y)))
         else:
-            dot_x = random.uniform(0, self.block_size)
-            dot_y = random.uniform(0, self.block_size)
-        self.red_dot = CircleDot((dot_x, dot_y))
+            # If no beehive, place dots randomly
+            for _ in range(count):
+                dot_x = random.uniform(0, self.block_size)
+                dot_y = random.uniform(0, self.block_size)
+                self.red_dots.append(CircleDot((dot_x, dot_y)))
+
+    def add_red_dot(self):
+        self.add_red_dots(1)
+        return self.red_dots[0]
 
     def _generate_gold_dot(self, spawn_x, spawn_y, width, height):
         dot_x = random.randint(spawn_x, spawn_x + width - 1)
