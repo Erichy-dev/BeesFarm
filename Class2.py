@@ -24,35 +24,34 @@ class Object:
             hive_width = self.beehive["width"]
             hive_height = self.beehive["height"]
             
-            # Calculate spawn regions within beehive
-            regions = []
-            if count <= 4:
-                # Divide beehive into regions based on count
-                region_width = hive_width / (count ** 0.5)
-                region_height = hive_height / (count ** 0.5)
-                
-                for i in range(min(2, count)):
-                    for j in range((count+1)//2):
-                        if len(regions) < count:
-                            region_x = hive_x + i * region_width
-                            region_y = hive_y + j * region_height
-                            regions.append((region_x, region_y, region_width, region_height))
+            # Expanded positioning for up to 10 bees in a larger grid pattern
+            preset_positions = [
+                # First row (4 positions)
+                (0.2, 0.2), (0.4, 0.2), (0.6, 0.2), (0.8, 0.2),
+                # Second row (3 positions)
+                (0.3, 0.5), (0.5, 0.5), (0.7, 0.5),
+                # Third row (3 positions)
+                (0.3, 0.8), (0.5, 0.8), (0.7, 0.8)
+            ]
             
-            # If we couldn't create regions (shouldn't happen), fall back to default
-            if not regions:
-                regions = [(hive_x, hive_y, hive_width, hive_height)] * count
+            for i in range(min(count, len(preset_positions))):
+                rel_x, rel_y = preset_positions[i]
+                # Apply to the beehive dimensions
+                dot_x = hive_x + rel_x * hive_width
+                dot_y = hive_y + rel_y * hive_height
                 
-            # Place dots in different regions with some randomness
-            for i in range(count):
-                region_x, region_y, region_w, region_h = regions[i % len(regions)]
+                # Add some small randomness
+                dot_x += random.uniform(-0.1, 0.1)
+                dot_y += random.uniform(-0.1, 0.1)
                 
-                # Add randomness within the region
-                offset_x = random.uniform(0.2, 0.8) * region_w
-                offset_y = random.uniform(0.2, 0.8) * region_h
-                
-                dot_x = region_x + offset_x
-                dot_y = region_y + offset_y
                 self.red_dots.append(CircleDot((dot_x, dot_y)))
+                
+            # If more bees requested than preset positions, add them with general spacing
+            if count > len(preset_positions):
+                for i in range(len(preset_positions), count):
+                    dot_x = hive_x + random.uniform(0.2, 0.8) * hive_width
+                    dot_y = hive_y + random.uniform(0.2, 0.8) * hive_height
+                    self.red_dots.append(CircleDot((dot_x, dot_y)))
         else:
             # If no beehive, place dots with spacing across the grid
             existing_positions = []

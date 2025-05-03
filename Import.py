@@ -89,8 +89,8 @@ def main():
         if not 1 <= num_houses <= 4:
             raise ValueError
             
-        num_red_dots = int(input("How many worker bees (red dots) do you want (1 to 4)? "))
-        if not 1 <= num_red_dots <= 4:
+        num_red_dots = int(input("How many worker bees (red dots) do you want (1 to 10)? "))
+        if not 1 <= num_red_dots <= 10:
             raise ValueError
     except ValueError:
         print("Invalid input. Please enter valid numbers as requested.")
