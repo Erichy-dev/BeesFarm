@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import random
-from Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon  # Fixed capitalization
+from comb.Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon  # Fixed import path
 
 # Size of the hexagons
 hex_size = 1
