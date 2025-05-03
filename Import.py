@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
 import random
-from Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon
+from comb.Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon
 
 def create_beehive_view(fig, gs):
     # Size of the hexagons
