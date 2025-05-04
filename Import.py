@@ -197,22 +197,32 @@ def regenerate_nectar(landscape, cycle_count, total_nectar):
     landscape.objects.gold_dots = []
     landscape.movement.gold_dots = []
     
+    # Clear silver dots to regenerate them
+    landscape.objects.silver_dots = []
+    landscape.movement.silver_dots = []
+    
     # Use the reset method in the Move class
     landscape.movement.reset_for_new_cycle()
     
     # Generate new gold dots
     landscape.objects.add_gold_dots(count=5)
     
+    # Generate new silver dots for this cycle
+    landscape.objects.add_silver_dots()
+    
     # Ensure each spawn point has at least one gold dot
     ensure_gold_dots_at_spawn_points(landscape.objects)
     
-    # Update the movement logic to use the new gold dots
+    # Update the movement logic to use the new gold dots and silver dots
     landscape.movement.gold_dots = landscape.objects.gold_dots
+    landscape.movement.silver_dots = landscape.objects.silver_dots
     
     # Reset bee positions to near the hive to start the new cycle
     reset_bee_positions(landscape, reset_attributes=True)
     
     print(f"\n🌱 NECTAR REGENERATED - Starting cycle {cycle_count} (Total nectar so far: {total_nectar})")
+    print(f"    - {len(landscape.objects.gold_dots)} gold nectar points generated")
+    print(f"    - {len(landscape.objects.silver_dots)} silver power-ups generated")
     return landscape, total_nectar
 
 def reset_bee_positions(landscape, reset_attributes=False):
@@ -247,6 +257,8 @@ def reset_bee_positions(landscape, reset_attributes=False):
             bee.current_size = bee.original_size
             # Reset speed to normal
             bee.speed_modifier = 1.0
+            # Reset silver interaction counter to allow growth in the new cycle
+            bee.silver_interactions = 0
             
             print(f"Reset bee #{i+1} attributes to normal (size: {bee.current_size}, speed: {bee.speed_modifier})")
 
