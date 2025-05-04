@@ -20,6 +20,9 @@ OFFSET_Y = np.sqrt(3) * HEX_SIZE
 FPS = 5  # Frames per second (determines animation interval)
 SIMULATION_SPEED = 1.0/FPS  # Seconds per frame - synchronized with FPS for real-time accuracy
 
+# Define the waiting period between nectar cycles (in seconds)
+WAIT_BETWEEN_CYCLES = 5.0  # Wait 5 seconds between cycles
+
 def create_beehive_view(fig, gs, worker_bee_count):
     # Size of the hexagons
     hex_size = HEX_SIZE
@@ -172,6 +175,55 @@ def ensure_gold_dots_at_spawn_points(landscape_objects):
             alliance_dot = CircleDot((dot_x + 0.5, dot_y + 0.5))
             landscape_objects.gold_dots.append(alliance_dot)
 
+def regenerate_nectar(landscape, cycle_count):
+    """
+    Regenerate nectar for the next collection cycle
+    """
+    # Clear existing gold dots and reset the counter
+    landscape.objects.gold_dots = []
+    landscape.movement.gold_dots = []
+    
+    # Use the reset method in the Move class
+    landscape.movement.reset_for_new_cycle()
+    
+    # Generate new gold dots
+    landscape.objects.add_gold_dots(count=5)
+    
+    # Ensure each spawn point has at least one gold dot
+    ensure_gold_dots_at_spawn_points(landscape.objects)
+    
+    # Update the movement logic to use the new gold dots
+    landscape.movement.gold_dots = landscape.objects.gold_dots
+    
+    # Reset bee positions to near the hive to start the new cycle
+    reset_bee_positions(landscape)
+    
+    print(f"\n🌱 NECTAR REGENERATED - Starting cycle {cycle_count}")
+    return landscape
+
+def reset_bee_positions(landscape):
+    """Reset bee positions to near the hive to start a new collection cycle"""
+    hive_x, hive_y = landscape.objects.beehive["position"]
+    hive_width = landscape.objects.beehive["width"]
+    hive_height = landscape.objects.beehive["height"]
+    
+    for i, bee in enumerate(landscape.objects.red_dots):
+        # Position just outside the hive with some randomness
+        x_offset = random.uniform(0.5, 1.5)
+        y_offset = random.uniform(0.5, 1.5)
+        
+        # Position around the hive
+        position_side = i % 4  # 0: right, 1: top, 2: left, 3: bottom
+        
+        if position_side == 0:  # right side
+            bee.position = [hive_x + hive_width + x_offset, hive_y + random.uniform(0, hive_height)]
+        elif position_side == 1:  # top
+            bee.position = [hive_x + random.uniform(0, hive_width), hive_y + hive_height + y_offset]
+        elif position_side == 2:  # left side
+            bee.position = [hive_x - x_offset, hive_y + random.uniform(0, hive_height)]
+        else:  # bottom
+            bee.position = [hive_x + random.uniform(0, hive_width), hive_y - y_offset]
+
 def main():
     try:
         num_houses = int(input("How many houses do you want (1 to 4)? "))
@@ -260,6 +312,13 @@ def main():
     last_nectar_count = 0
     is_nectar_exhausted = False
     
+    # Track nectar regeneration cycles
+    nectar_cycle_count = 1
+    
+    # Add waiting state variables
+    waiting_for_next_cycle = False
+    cycle_complete_time = None
+    
     # Define a function to measure distance between two points
     def distance(p1, p2):
         return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
@@ -298,17 +357,12 @@ def main():
             
         print(f"[DEBUG] All bees returned: {all_returned}")
             
-        # FORCE COMPLETION FOR DEBUGGING - uncomment to override check and force completion
-        force_complete = False
-        if force_complete:
-            print("[DEBUG] FORCING COMPLETION FOR DEBUGGING")
-            return True
-            
         return all_returned
     
     # Define animation update function that updates both displays
     def update(frame):
-        nonlocal last_nectar_count, is_nectar_exhausted, final_time, simulation_completed
+        nonlocal last_nectar_count, is_nectar_exhausted, final_time, simulation_completed, nectar_cycle_count
+        nonlocal waiting_for_next_cycle, cycle_complete_time
         
         # Get real elapsed time for accurate timing
         elapsed_time = time.time() - start_time
@@ -319,17 +373,31 @@ def main():
             timestamp_text.set_text(f"Time: {final_time:.1f} seconds - COMPLETED")
             return all_artists
         
-        # Force completion after 60 seconds (1 minute) as a safety mechanism
-        max_simulation_time = 60.0  # 1 minute
-        if elapsed_time > max_simulation_time:
-            simulation_completed = True
-            final_time = elapsed_time
-            timestamp_text.set_text(f"Time: {final_time:.1f} seconds - TIMED OUT")
-            print(f"\n⏱️ SIMULATION TIMED OUT at {final_time:.1f} seconds")
-            print(f"Collected {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
-            # Stop the animation
-            ani.event_source.stop()
-            return all_artists
+        # If we're in the waiting period between cycles
+        if waiting_for_next_cycle:
+            wait_time_elapsed = time.time() - cycle_complete_time
+            remaining_wait = WAIT_BETWEEN_CYCLES - wait_time_elapsed
+            
+            if remaining_wait > 0:
+                # Still waiting, update the status text
+                timestamp_text.set_text(f"Time: {formatted_time} seconds (Next cycle in {remaining_wait:.1f}s)")
+                return all_artists
+            else:
+                # Waiting period is over, regenerate nectar
+                print(f"\n⏰ Waiting period complete. Regenerating nectar for cycle {nectar_cycle_count}...")
+                waiting_for_next_cycle = False
+                
+                # Regenerate nectar and reset for the next cycle
+                nectar_cycle_count += 1
+                regenerate_nectar(landscape, nectar_cycle_count)
+                
+                # Reset tracking variables
+                is_nectar_exhausted = False
+                last_nectar_count = 0
+                
+                # Update display to show the new cycle
+                nectar_text.set_text(f"Nectar Collected: 0/{landscape.max_gold_collected} (Cycle {nectar_cycle_count})")
+                return all_artists
         
         # Check for completion directly
         simulation_should_complete = check_simulation_completed()
@@ -343,16 +411,17 @@ def main():
             for i, dot in enumerate(landscape.objects.red_dots):
                 print(f"[DEBUG] Bee #{i+1} at position {dot.position}")
             
-        if simulation_should_complete or movement_completed:
-            if not simulation_completed:
-                # First time hitting completion
-                simulation_completed = True
-                final_time = elapsed_time
-                timestamp_text.set_text(f"Time: {final_time:.1f} seconds - COMPLETED")
-                print(f"\n🏁 SIMULATION COMPLETED at {final_time:.1f} seconds")
-                print(f"All {len(landscape.objects.red_dots)} bees returned to hive with {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
-                # Stop the animation
-                ani.event_source.stop()
+        if (simulation_should_complete or movement_completed) and not waiting_for_next_cycle:
+            # Cycle is complete, enter waiting state
+            print(f"\n🍯 NECTAR CYCLE {nectar_cycle_count} COMPLETED at {elapsed_time:.1f} seconds")
+            print(f"All {len(landscape.objects.red_dots)} bees returned to hive with {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
+            print(f"Waiting {WAIT_BETWEEN_CYCLES} seconds before starting next cycle...")
+            
+            waiting_for_next_cycle = True
+            cycle_complete_time = time.time()
+            
+            # Update text to show waiting status
+            timestamp_text.set_text(f"Time: {formatted_time} seconds (Next cycle in {WAIT_BETWEEN_CYCLES:.1f}s)")
             return all_artists
         
         # Update landscape simulation
@@ -378,26 +447,16 @@ def main():
                             hex_patch.set_facecolor((1.0, 0.8 - honey_intensity * 0.3, 0.2, 0.7 + honey_intensity * 0.3))
                 
                 # Update status text only if something changed
-                nectar_text.set_text(f"Nectar Collected: {gold_collected}/{landscape.max_gold_collected}")
+                nectar_text.set_text(f"Nectar Collected: {gold_collected}/{landscape.max_gold_collected} (Cycle {nectar_cycle_count})")
                 last_nectar_count = gold_collected
                 
                 # Check if nectar is exhausted
                 if gold_collected >= landscape.max_gold_collected:
                     is_nectar_exhausted = True
                     print(f"[DEBUG] Nectar target reached ({gold_collected}/{landscape.max_gold_collected}), checking for completion...")
-                    # Do an extra check for completion when we first reach the nectar target
-                    simulation_should_complete = check_simulation_completed() 
-                    if simulation_should_complete and not simulation_completed:
-                        simulation_completed = True
-                        final_time = elapsed_time
-                        timestamp_text.set_text(f"Time: {final_time:.1f} seconds - COMPLETED")
-                        print(f"\n🏁 SIMULATION COMPLETED at {final_time:.1f} seconds")
-                        print(f"All {len(landscape.objects.red_dots)} bees returned to hive with {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
-                        ani.event_source.stop()
-                        return all_artists
             
             # Always update timestamp and bee positions (unless simulation is completed)
-            if not simulation_completed:
+            if not simulation_completed and not waiting_for_next_cycle:
                 timestamp_text.set_text(f"Time: {formatted_time} seconds")
             
             # Track bee sizes for reporting

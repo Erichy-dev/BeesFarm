@@ -28,9 +28,27 @@ class Move:
         # Track interactions with silver dots - move this BEFORE _assign_bee_ids call
         self.silver_dot_interactions = {}
         
+        # Add a cycles counter to track how many nectar cycles completed
+        self.cycles_completed = 0
+        
         self._assign_bee_ids()
         
         print(f"Initializing simulation with {len(red_dots)} bees")
+        
+    def reset_for_new_cycle(self):
+        """Reset the relevant state variables for a new nectar cycle"""
+        self.gold_collected = 0
+        self.returning_dots = set()  # Clear returning dots
+        self.settled_dots = set()    # Clear settled dots
+        self.dot_targets = {}        # Clear existing targets
+        self.completed = False       # Reset completion state
+        
+        # Increment cycle counter
+        self.cycles_completed += 1
+        
+        # We don't reset silver_dot_interactions so bees can stay enhanced
+        # through multiple cycles
+        print(f"Move state reset for nectar cycle {self.cycles_completed + 1}")
         
     def _assign_bee_ids(self):
         """Assign unique IDs to bees for tracking purposes"""
@@ -242,7 +260,7 @@ class Move:
             
             if all_settled:
                 self.completed = True
-                print(f"\nSIMULATION COMPLETED: All bees have settled in the hive with nectar: {self.gold_collected}/{self.max_gold_collected}")
+                print(f"\nCYCLE COMPLETED: All bees have settled in the hive with nectar: {self.gold_collected}/{self.max_gold_collected}")
             return
             
         # Process each red dot that hasn't settled yet
