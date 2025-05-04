@@ -122,13 +122,43 @@ class Move:
             next_x = red_dot.position[0] + step_size * math.cos(angle)
             next_y = red_dot.position[1] + step_size * math.sin(angle)
 
-            # Avoid pond
-            if self.is_inside_pond(next_x, next_y):
-                next_x, next_y = self.calculate_curved_detour(red_dot, angle, step_size)
-
-            # Avoid forbidden zone
-            if self.forbidden_zone_func and self.forbidden_zone_func(next_x, next_y):
-                next_x, next_y = self.calculate_curved_detour(red_dot, angle, step_size)
+            # Avoid obstacles - keep trying different detours until we find a valid position
+            # or hit the maximum number of attempts
+            max_detour_attempts = 5
+            detour_attempts = 0
+            
+            # Check for pond and forbidden zone repeatedly until we find a valid position
+            while ((self.is_inside_pond(next_x, next_y) or 
+                   (self.forbidden_zone_func and self.forbidden_zone_func(next_x, next_y))) and 
+                   detour_attempts < max_detour_attempts):
+                
+                # Calculate a new detour with increasing avoidance angle on each attempt
+                detour_angle_modifier = self.avoidance_angle_offset * (1 + 0.5 * detour_attempts)
+                detour_angle = angle + detour_angle_modifier + random.uniform(-0.3, 0.3)
+                radius_multiplier = 2.0 + detour_attempts * 0.5  # Widen the arc with each attempt
+                
+                next_x = red_dot.position[0] + step_size * radius_multiplier * math.cos(detour_angle)
+                next_y = red_dot.position[1] + step_size * radius_multiplier * math.sin(detour_angle)
+                
+                detour_attempts += 1
+            
+            # If we still couldn't find a valid position after max attempts,
+            # try a completely random direction with a larger step
+            if (self.is_inside_pond(next_x, next_y) or 
+                (self.forbidden_zone_func and self.forbidden_zone_func(next_x, next_y))):
+                
+                # Use a random angle for emergency escape
+                emergency_angle = random.uniform(0, 2 * math.pi)
+                emergency_step = step_size * 3.0  # Larger step to escape
+                
+                next_x = red_dot.position[0] + emergency_step * math.cos(emergency_angle)
+                next_y = red_dot.position[1] + emergency_step * math.sin(emergency_angle)
+                
+                # Final safety check - if still in forbidden zone, don't move at all
+                if (self.is_inside_pond(next_x, next_y) or 
+                    (self.forbidden_zone_func and self.forbidden_zone_func(next_x, next_y))):
+                    # Don't move - stay in place
+                    next_x, next_y = red_dot.position
             
             # Oscillation detection and correction
             if bee_index is not None:
@@ -151,6 +181,12 @@ class Move:
                         random_angle = random.uniform(0, 2 * math.pi)
                         next_x = red_dot.position[0] + step_size * 1.5 * math.cos(random_angle)
                         next_y = red_dot.position[1] + step_size * 1.5 * math.sin(random_angle)
+                        
+                        # Final safety check for oscillation-breaking move
+                        if (self.is_inside_pond(next_x, next_y) or 
+                            (self.forbidden_zone_func and self.forbidden_zone_func(next_x, next_y))):
+                            # Don't move - stay in place
+                            next_x, next_y = red_dot.position
             
             # Update position
             red_dot.position = [next_x, next_y]
@@ -187,14 +223,6 @@ class Move:
         px, py = self.pond_position
         pw, ph = self.pond_size
         return px <= x <= px + pw and py <= y <= py + ph
-
-    def calculate_curved_detour(self, red_dot, current_angle, step_size):
-        # Randomize the avoidance angle a bit to prevent identical paths
-        detour_angle = current_angle + self.avoidance_angle_offset + random.uniform(-0.3, 0.3)
-        radius_multiplier = 2.0  # Wider arc around the obstacle
-        new_x = red_dot.position[0] + step_size * radius_multiplier * math.cos(detour_angle)
-        new_y = red_dot.position[1] + step_size * radius_multiplier * math.sin(detour_angle)
-        return new_x, new_y
 
     def find_closest_gold_dot(self, red_dot):
         if not self.gold_dots:
