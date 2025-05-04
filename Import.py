@@ -6,6 +6,7 @@ from matplotlib.gridspec import GridSpec
 import numpy as np
 import random
 import matplotlib.animation as animation
+import time  # For tracking real elapsed time
 from comb.Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon
 
 # Define constant parameters for the hexagon grid
@@ -16,8 +17,8 @@ OFFSET_X = 1.5 * HEX_SIZE
 OFFSET_Y = np.sqrt(3) * HEX_SIZE
 
 # Define simulation speed parameters
-SIMULATION_SPEED = 0.5  # Seconds per frame
 FPS = 5  # Frames per second (determines animation interval)
+SIMULATION_SPEED = 1.0/FPS  # Seconds per frame - synchronized with FPS for real-time accuracy
 
 def create_beehive_view(fig, gs, worker_bee_count):
     # Size of the hexagons
@@ -199,8 +200,8 @@ def main():
     # Show landscape initially
     landscape.display(fig=fig, subplot_spec=gs[0, 1], title=f"Landscape with {num_red_dots} Worker Bees")
     
-    # Track simulation time
-    simulation_time = [0.0]  # In seconds
+    # Track real time when animation starts
+    start_time = time.time()
     
     # Create static list of artists to avoid flickering
     all_artists = []
@@ -237,9 +238,9 @@ def main():
     def update(frame):
         nonlocal last_nectar_count, is_nectar_exhausted
         
-        # Update simulation time (in seconds)
-        simulation_time[0] += SIMULATION_SPEED
-        formatted_time = f"{simulation_time[0]:.1f}"
+        # Get real elapsed time for accurate timing
+        elapsed_time = time.time() - start_time
+        formatted_time = f"{elapsed_time:.1f}"
         
         # Update landscape simulation
         if landscape.movement and not landscape.movement.completed:
