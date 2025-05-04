@@ -223,6 +223,12 @@ def main():
     # Track real time when animation starts
     start_time = time.time()
     
+    # Final time when simulation completes (to freeze the clock)
+    final_time = None
+    
+    # Simulation completion flag (separate from landscape.movement.completed)
+    simulation_completed = False
+    
     # Create static list of artists to avoid flickering
     all_artists = []
     
@@ -254,16 +260,103 @@ def main():
     last_nectar_count = 0
     is_nectar_exhausted = False
     
+    # Define a function to measure distance between two points
+    def distance(p1, p2):
+        return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
+    
+    # Define custom completion check that's more robust
+    def check_simulation_completed():
+        """Check if simulation should be considered complete"""
+        # First check if all nectar has been collected
+        nectar_all_collected = landscape.movement.are_all_nectar_collected()
+        if not nectar_all_collected:
+            print(f"[DEBUG] Not all nectar collected yet: {landscape.movement.gold_collected}/{landscape.max_gold_collected}")
+            return False
+        
+        # Only check bee positions if all nectar is collected
+        print(f"\n[DEBUG] All nectar collected ({landscape.movement.gold_collected}/{landscape.max_gold_collected}), checking bees")
+            
+        # Get the actual beehive position from the movement logic
+        movement_beehive_position = landscape.movement.beehive_position
+        print(f"[DEBUG] Beehive position: {movement_beehive_position}")
+            
+        # Check if all bees are in the beehive area OR close enough to the beehive
+        all_returned = True
+        max_distance_threshold = 2.0  # Maximum allowed distance from beehive center
+            
+        for i, dot in enumerate(landscape.objects.red_dots):
+            x, y = dot.position
+            # Check distance to beehive center
+            dist_to_hive = distance((x, y), movement_beehive_position)
+            is_close_enough = dist_to_hive <= max_distance_threshold
+                
+            print(f"[DEBUG] Bee #{i+1} at position {dot.position} - Distance to hive: {dist_to_hive:.2f}, Close enough: {is_close_enough}")
+                
+            # Consider the bee "returned" if it's close enough
+            if not is_close_enough:
+                all_returned = False
+            
+        print(f"[DEBUG] All bees returned: {all_returned}")
+            
+        # FORCE COMPLETION FOR DEBUGGING - uncomment to override check and force completion
+        force_complete = False
+        if force_complete:
+            print("[DEBUG] FORCING COMPLETION FOR DEBUGGING")
+            return True
+            
+        return all_returned
+    
     # Define animation update function that updates both displays
     def update(frame):
-        nonlocal last_nectar_count, is_nectar_exhausted
+        nonlocal last_nectar_count, is_nectar_exhausted, final_time, simulation_completed
         
         # Get real elapsed time for accurate timing
         elapsed_time = time.time() - start_time
         formatted_time = f"{elapsed_time:.1f}"
         
+        # If already completed, don't update the timer
+        if simulation_completed:
+            timestamp_text.set_text(f"Time: {final_time:.1f} seconds - COMPLETED")
+            return all_artists
+        
+        # Force completion after 60 seconds (1 minute) as a safety mechanism
+        max_simulation_time = 60.0  # 1 minute
+        if elapsed_time > max_simulation_time:
+            simulation_completed = True
+            final_time = elapsed_time
+            timestamp_text.set_text(f"Time: {final_time:.1f} seconds - TIMED OUT")
+            print(f"\n⏱️ SIMULATION TIMED OUT at {final_time:.1f} seconds")
+            print(f"Collected {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
+            # Stop the animation
+            ani.event_source.stop()
+            return all_artists
+        
+        # Check for completion directly
+        simulation_should_complete = check_simulation_completed()
+        movement_completed = hasattr(landscape.movement, 'completed') and landscape.movement.completed
+        
+        # Log the completion status
+        if frame % 20 == 0:  # Only log every 20 frames to reduce spam
+            print(f"[DEBUG] Frame {frame} - Simulation should complete: {simulation_should_complete}")
+            print(f"[DEBUG] Frame {frame} - Movement completed: {movement_completed}")
+            print(f"[DEBUG] Current nectar: {landscape.movement.gold_collected}/{landscape.max_gold_collected}")
+            for i, dot in enumerate(landscape.objects.red_dots):
+                print(f"[DEBUG] Bee #{i+1} at position {dot.position}")
+            
+        if simulation_should_complete or movement_completed:
+            if not simulation_completed:
+                # First time hitting completion
+                simulation_completed = True
+                final_time = elapsed_time
+                timestamp_text.set_text(f"Time: {final_time:.1f} seconds - COMPLETED")
+                print(f"\n🏁 SIMULATION COMPLETED at {final_time:.1f} seconds")
+                print(f"All {len(landscape.objects.red_dots)} bees returned to hive with {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
+                # Stop the animation
+                ani.event_source.stop()
+            return all_artists
+        
         # Update landscape simulation
-        if landscape.movement and not landscape.movement.completed:
+        if landscape.movement:
             landscape.movement.update_state()
             
             # Get current nectar collection count
@@ -291,9 +384,21 @@ def main():
                 # Check if nectar is exhausted
                 if gold_collected >= landscape.max_gold_collected:
                     is_nectar_exhausted = True
+                    print(f"[DEBUG] Nectar target reached ({gold_collected}/{landscape.max_gold_collected}), checking for completion...")
+                    # Do an extra check for completion when we first reach the nectar target
+                    simulation_should_complete = check_simulation_completed() 
+                    if simulation_should_complete and not simulation_completed:
+                        simulation_completed = True
+                        final_time = elapsed_time
+                        timestamp_text.set_text(f"Time: {final_time:.1f} seconds - COMPLETED")
+                        print(f"\n🏁 SIMULATION COMPLETED at {final_time:.1f} seconds")
+                        print(f"All {len(landscape.objects.red_dots)} bees returned to hive with {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
+                        ani.event_source.stop()
+                        return all_artists
             
-            # Always update timestamp and bee positions
-            timestamp_text.set_text(f"Time: {formatted_time} seconds")
+            # Always update timestamp and bee positions (unless simulation is completed)
+            if not simulation_completed:
+                timestamp_text.set_text(f"Time: {formatted_time} seconds")
             
             # Track bee sizes for reporting
             bee_size_changes = False

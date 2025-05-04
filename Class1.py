@@ -135,8 +135,10 @@ class Landscape:
             ax.add_patch(red_circle)
             red_circles.append(red_circle)
 
-        for silver_dot in self.objects.silver_dots:
-            ax.plot(silver_dot.position[0], silver_dot.position[1], 'o', color='silver', markersize=5, label="Silver Dot")
+        # Fix silver dots - only add label to the first one
+        for i, silver_dot in enumerate(self.objects.silver_dots):
+            label = "Silver Dot" if i == 0 else "_nolegend_"
+            ax.plot(silver_dot.position[0], silver_dot.position[1], 'o', color='silver', markersize=5, label=label)
 
         gold_circles = []
         for i, gold_dot in enumerate(self.objects.gold_dots):
