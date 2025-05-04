@@ -103,6 +103,46 @@ def create_beehive_view(fig, gs, worker_bee_count):
     
     return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text
 
+def ensure_gold_dots_at_spawn_points(landscape_objects):
+    """
+    Ensures that each spawn point has at least one gold dot (alliance).
+    This function checks if there are gold dots in each spawn area and 
+    adds one if none are found.
+    """
+    spawn_areas = [
+        {"position": (1, 4), "width": 3, "height": 3},
+        {"position": (1, 11), "width": 3, "height": 3},
+        {"position": (7, 4), "width": 3, "height": 3},
+        {"position": (7, 11), "width": 3, "height": 3}
+    ]
+    
+    # Check each spawn area
+    for area in spawn_areas:
+        x0, y0 = area["position"]
+        width, height = area["width"], area["height"]
+        
+        # Define the area boundaries
+        x_min, x_max = x0, x0 + width
+        y_min, y_max = y0, y0 + height
+        
+        # Check if any gold dots are in this area
+        has_gold_in_area = False
+        for gold_dot in landscape_objects.gold_dots:
+            gx, gy = gold_dot.position
+            if x_min <= gx <= x_max and y_min <= gy <= y_max:
+                has_gold_in_area = True
+                break
+        
+        # If no gold dots in this area, add one (alliance)
+        if not has_gold_in_area:
+            print(f"Adding alliance (gold nectar) to spawn area at {area['position']}")
+            # Generate a gold dot in the center of the area
+            dot_x = x0 + width // 2
+            dot_y = y0 + height // 2
+            from Class2 import CircleDot
+            alliance_dot = CircleDot((dot_x + 0.5, dot_y + 0.5))
+            landscape_objects.gold_dots.append(alliance_dot)
+
 def main():
     try:
         num_houses = int(input("How many houses do you want (1 to 4)? "))
@@ -132,6 +172,9 @@ def main():
     landscape.objects.add_red_dots(count=num_red_dots)  # Now using add_red_dots with count
     landscape.objects.add_gold_dots(count=5)
     landscape.objects.add_silver_dots()
+    
+    # Ensure there's gold nectar (alliance) at each spawn point
+    ensure_gold_dots_at_spawn_points(landscape.objects)
 
     # Initialize movement logic with obstacle avoidance (pond + forbidden zone)
     landscape.movement = Move(
