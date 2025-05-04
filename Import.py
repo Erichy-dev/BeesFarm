@@ -8,6 +8,7 @@ import random
 import matplotlib.animation as animation
 import time  # For tracking real elapsed time
 from comb.Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon
+from comb.Beehive import create_beehive_visualization, update_nectar_level
 
 # Define constant parameters for the hexagon grid
 HEX_SIZE = 1
@@ -24,119 +25,32 @@ SIMULATION_SPEED = 1.0/FPS  # Seconds per frame - synchronized with FPS for real
 WAIT_BETWEEN_CYCLES = 10.0  # Increased from 5 to 10 seconds
 
 def create_beehive_view(fig, gs, worker_bee_count):
-    # Size of the hexagons
-    hex_size = HEX_SIZE
+    """
+    Create the beehive visualization using the new simplified version.
+    This is a wrapper around the create_beehive_visualization function.
+    """
+    # Use our new visualization function from comb/Beehive.py
+    ax, hexagon_grid, circle_markers, nectar_status, bee_status = create_beehive_visualization(
+        fig=fig,
+        subplot=gs[0, 0],
+        num_bees=worker_bee_count,
+        max_nectar=20  # Maximum nectar per cycle
+    )
     
-    # Create a grid of hexagons
-    cols, rows = COLS, ROWS  # Number of hexagons in columns and rows
-    
-    # Offset for staggered rows
-    offset_x = OFFSET_X
-    offset_y = OFFSET_Y
-    
-    # Create subplot for beehive
-    ax = fig.add_subplot(gs[0, 0])
-    ax.set_aspect('equal')
-    
-    # Adjust axis limits to create more space for text
-    # Calculate the max extent of the hexagon grid
-    max_x = cols * offset_x
-    max_y = rows * offset_y + offset_y/2
-    
-    # Set extended limits with extra padding at bottom for text
-    ax.set_xlim(-1, max_x + 1)
-    ax.set_ylim(-9, max_y + 1)  # Increase bottom space to -9 for more text space
-    
-    ax.axis('off')  # Turn off all axes, spines, and ticks
-    
-    # Initialize counts for the markers
-    circle_count = worker_bee_count  # Use the same number of worker bees as red dots in the simulation
-    triangle_count = random.randint(1, 5)
-    square_count = random.randint(1, 5)
-    
-    # Generate marker positions
-    def generate_marker_positions(marker_count):
-        positions = []
-        for _ in range(marker_count):
-            random_col = random.randint(0, cols - 1)
-            random_row = random.randint(0, rows - 1)
-            x = random_col * offset_x  # X coordinate of the hexagon
-            y = random_row * offset_y  # Y coordinate of the hexagon
-            
-            # Apply staggered row adjustment for the selected column
-            if random_col % 2 == 1:
-                y += offset_y / 2
-                
-            positions.append((x, y))
-        return positions
-    
-    # Generate positions
-    circle_positions = generate_marker_positions(circle_count)
-    triangle_positions = generate_marker_positions(triangle_count)
-    square_positions = generate_marker_positions(square_count)
-    
-    # Draw filled hexagons
-    hexagon_grid = []
-    for row in range(rows):
-        row_hexagons = []
-        for col in range(cols):
-            x = col * offset_x
-            y = row * offset_y
-            
-            # Stagger odd rows
-            if col % 2 == 1:
-                y += offset_y / 2
-                
-            x_hexagon, y_hexagon = hexagon(x, y, hex_size)
-            patch = ax.fill(x_hexagon, y_hexagon, edgecolor="black", facecolor="gold", lw=1)[0]
-            row_hexagons.append(patch)
-        hexagon_grid.append(row_hexagons)
-    
-    # Plot the markers
-    circle_markers = []
-    for circle_x, circle_y in circle_positions:
-        # Initial size is just the default (will be updated when bees interact with silver)
-        circle_marker = CircleMarker(circle_x, circle_y, radius=0.1, color='red')
-        circle_marker.plot(ax)
-        circle_markers.append(circle_marker)
-        
-    triangle_markers = []
-    for triangle_x, triangle_y in triangle_positions:
-        triangle_marker = TriangleMarker(triangle_x, triangle_y)
-        triangle_marker.plot(ax)
-        triangle_markers.append(triangle_marker)
-        
-    square_markers = []
-    for square_x, square_y in square_positions:
-        square_marker = RectangleMarker(square_x, square_y)
-        square_marker.plot(ax)
-        square_markers.append(square_marker)
-    
-    # Add a title for the beehive view
-    ax.set_title("Beehive Visualization", fontsize=14, pad=15)
-    
-    # Position text in the extra space below the hexagons (using data coordinates, not axes coordinates)
+    # Position text in the extra space below the hexagons (data coordinates)
     # Add status text for bee sizes at the top
+    max_x = 10 * 1.5  # COLS * OFFSET_X from Beehive.py
+    
     bee_sizes_text = ax.text(max_x/2 - 2, -1.5, "Bee Growth: Normal", 
                            color='purple', fontweight='bold', fontsize=12,
                            horizontalalignment='center')
     
-    # Position the other three texts below the Bee Growth text, one per line
-    bee_status_text = ax.text(max_x/2 - 2, -3, f"Worker Bees: {circle_count}", 
-                             color='red', fontweight='bold', fontsize=12,
-                             horizontalalignment='center')
-    
     timestamp_text = ax.text(max_x/2 - 2, -5, "Time: 0.0 seconds", fontsize=12,
-                           horizontalalignment='center')
+                          horizontalalignment='center')
     
-    nectar_text = ax.text(max_x/2 - 2, -7, "Nectar Collected: 0", 
-                         color='darkorange', fontweight='bold', fontsize=12,
-                         horizontalalignment='center')
-    
-    # Add text for total nectar collected - make it more prominent
     # Create a box for the total counter
     total_box = plt.Rectangle((0, -9), max_x, 1.3, facecolor='honeydew', 
-                             edgecolor='forestgreen', alpha=0.8, transform=ax.transData)
+                            edgecolor='forestgreen', alpha=0.8, transform=ax.transData)
     ax.add_patch(total_box)
     
     # Add the prominent text for total nectar
@@ -144,7 +58,11 @@ def create_beehive_view(fig, gs, worker_bee_count):
                              color='darkgreen', fontweight='bold', fontsize=16,
                              horizontalalignment='center', verticalalignment='center')
     
-    return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text, bee_sizes_text, total_nectar_text, total_box
+    # Create empty placeholder lists for compatibility with existing code
+    triangle_markers = []
+    square_markers = []
+    
+    return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status, timestamp_text, nectar_status, bee_sizes_text, total_nectar_text, total_box
 
 def ensure_gold_dots_at_spawn_points(landscape_objects):
     """
@@ -304,7 +222,7 @@ def main():
     gs = GridSpec(1, 2, width_ratios=[1, 1])
     
     # Create beehive visualization with the correct number of worker bees
-    beehive_ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text, bee_sizes_text, total_nectar_text, total_box = create_beehive_view(fig, gs, num_red_dots)
+    beehive_ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status, timestamp_text, nectar_status, bee_sizes_text, total_nectar_text, total_box = create_beehive_view(fig, gs, num_red_dots)
     
     # Initialize the landscape grid and environment
     landscape = Landscape(block_size=15, max_gold_collected=20, num_houses=num_houses)
@@ -364,8 +282,7 @@ def main():
     
     # Add text elements
     all_artists.append(timestamp_text)
-    all_artists.append(nectar_text)
-    all_artists.append(bee_status_text)
+    all_artists.append(nectar_status)
     all_artists.append(bee_sizes_text)
     all_artists.append(total_nectar_text)
     all_artists.append(total_box)  # Add the background box for total nectar
@@ -457,17 +374,32 @@ def main():
                 # Add current nectar count to total before regenerating
                 total_nectar_collected += landscape.movement.gold_collected
                 
+                # Print the accumulated nectar information for debugging
+                print(f"\n🍯 TOTAL NECTAR ACCUMULATED: {total_nectar_collected} (after cycle {nectar_cycle_count})")
+                print(f"    This should make the honeycomb visibly darker now")
+                
                 # Regenerate nectar and reset for the next cycle
                 nectar_cycle_count += 1
                 landscape, total_nectar = regenerate_nectar(landscape, nectar_cycle_count, total_nectar_collected)
                 
-                # Reset tracking variables
+                # Reset tracking variables for this cycle
                 is_nectar_exhausted = False
                 last_nectar_count = 0
                 
                 # Update display to show the new cycle and total
                 gold_collected = landscape.movement.gold_collected
-                nectar_text.set_text(f"Nectar Collected: {gold_collected}/{landscape.max_gold_collected} (Cycle {nectar_cycle_count})")
+                
+                # Update nectar visualization with the total nectar (accumulated so far)
+                update_nectar_level(
+                    hexagon_grid, 
+                    gold_collected,                  # Current cycle's nectar (0 at start)
+                    landscape.max_gold_collected,    # Max nectar per cycle
+                    total_nectar_collected,          # Total nectar accumulated so far
+                    nectar_cycle_count,              # Current cycle 
+                    nectar_status
+                )
+                
+                # Update the total counter
                 total_nectar_text.set_text(f"TOTAL NECTAR: {total_nectar_collected}")
                 
                 # Reset circle markers to match refreshed bee attributes
@@ -482,6 +414,27 @@ def main():
                 
                 # Reset bee size text
                 bee_sizes_text.set_text("Bee Growth: Normal")
+                
+                # Also update this for cycle completion:
+                if (simulation_should_complete or movement_completed) and not waiting_for_next_cycle:
+                    # Cycle is complete, enter waiting state
+                    print(f"\n🍯 NECTAR CYCLE {nectar_cycle_count} COMPLETED at {elapsed_time:.1f} seconds")
+                    print(f"All {len(landscape.objects.red_dots)} bees returned to hive with {landscape.movement.gold_collected}/{landscape.max_gold_collected} nectar")
+                    print(f"Total nectar collected so far: {total_nectar_collected + landscape.movement.gold_collected}")
+                    print(f"Waiting {WAIT_BETWEEN_CYCLES} seconds before starting next cycle...")
+                    
+                    # Update final appearance of the honeycomb before entering waiting state
+                    update_nectar_level(
+                        hexagon_grid, 
+                        landscape.movement.gold_collected,  # Current cycle's nectar
+                        landscape.max_gold_collected,       # Max nectar per cycle
+                        total_nectar_collected + landscape.movement.gold_collected,  # Total including this cycle
+                        nectar_cycle_count,                 # Current cycle 
+                        nectar_status
+                    )
+                    
+                    waiting_for_next_cycle = True
+                    cycle_complete_time = time.time()
                 
                 return all_artists
         
@@ -520,22 +473,20 @@ def main():
             
             # Only update visual elements if nectar count changed
             if gold_collected != last_nectar_count or not is_nectar_exhausted:
-                # Update the hexagon colors based on nectar collection progress
-                if gold_collected > 0:
-                    # Calculate how many rows to fill based on nectar collection
-                    fill_level = min(5, max(1, int(gold_collected / landscape.max_gold_collected * 5)))
-                    
-                    # Fill hexagons with honey color based on collection progress
-                    for row_idx in range(fill_level):
-                        row = hexagon_grid[row_idx]
-                        for hex_patch in row:
-                            # Set a honey color gradient based on collection progress
-                            honey_intensity = gold_collected / landscape.max_gold_collected
-                            hex_patch.set_facecolor((1.0, 0.8 - honey_intensity * 0.3, 0.2, 0.7 + honey_intensity * 0.3))
+                # Use our new nectar update function with total nectar and cycle information
+                update_nectar_level(
+                    hexagon_grid, 
+                    gold_collected,                  # Current cycle's nectar
+                    landscape.max_gold_collected,    # Max nectar per cycle
+                    total_nectar_collected + gold_collected,  # Total nectar (previous + current)
+                    nectar_cycle_count,              # Current cycle 
+                    nectar_status
+                )
                 
-                # Update status text only if something changed
-                nectar_text.set_text(f"Nectar Collected: {gold_collected}/{landscape.max_gold_collected} (Cycle {nectar_cycle_count})")
-                total_nectar_text.set_text(f"TOTAL NECTAR: {total_nectar_collected}")
+                # We don't need to set nectar_status text here, as the update_nectar_level function now does it
+                
+                # Update total nectar text
+                total_nectar_text.set_text(f"TOTAL NECTAR: {total_nectar_collected + gold_collected}")
                 last_nectar_count = gold_collected
                 
                 # Check if nectar is exhausted
