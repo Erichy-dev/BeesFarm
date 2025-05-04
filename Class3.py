@@ -3,10 +3,11 @@ import math
 import random  # Add random for logging with unique IDs
 
 class Move:
-    def __init__(self, red_dots, gold_dots, beehive_position, max_gold_collected, pond_position, pond_size, forbidden_zone_func=None):
+    def __init__(self, red_dots, gold_dots, beehive_position, max_gold_collected, pond_position, pond_size, forbidden_zone_func=None, silver_dots=None):
         self.red_dots = red_dots  # Now a list of red dots
         self.dot_targets = {}  # Track which red dot is targeting which gold dot
         self.gold_dots = gold_dots
+        self.silver_dots = silver_dots or []  # Track silver dots for interactions
         self.beehive_position = beehive_position
         self.last_beehive_position = (12, 2)
         self.max_gold_collected = max_gold_collected
@@ -23,6 +24,10 @@ class Move:
         self.position_history = {}
         self.oscillation_count = {}
         self.bee_ids = {}
+        
+        # Track interactions with silver dots - move this BEFORE _assign_bee_ids call
+        self.silver_dot_interactions = {}
+        
         self._assign_bee_ids()
         
         print(f"Initializing simulation with {len(red_dots)} bees")
@@ -33,6 +38,7 @@ class Move:
             self.bee_ids[i] = f"Bee-{i+1}"
             self.position_history[i] = []
             self.oscillation_count[i] = 0
+            self.silver_dot_interactions[i] = 0
     
     def log_important_event(self, bee_index, message):
         """Log only important events to reduce output but maintain visibility"""
@@ -68,6 +74,17 @@ class Move:
         return False
 
     def move_towards(self, red_dot, target_position, step_size=0.4):
+        # Apply speed modifier from silver dot interactions
+        bee_index = None
+        for i, dot in enumerate(self.red_dots):
+            if dot is red_dot:
+                bee_index = i
+                break
+        
+        # Apply speed modifier if this bee has one
+        if hasattr(red_dot, 'speed_modifier'):
+            step_size *= red_dot.speed_modifier
+        
         dx = target_position[0] - red_dot.position[0]
         dy = target_position[1] - red_dot.position[1]
         distance = math.hypot(dx, dy)
@@ -86,13 +103,6 @@ class Move:
             # Avoid forbidden zone
             if self.forbidden_zone_func and self.forbidden_zone_func(next_x, next_y):
                 next_x, next_y = self.calculate_curved_detour(red_dot, angle, step_size)
-
-            # Find which bee this is
-            bee_index = None
-            for i, dot in enumerate(self.red_dots):
-                if dot is red_dot:
-                    bee_index = i
-                    break
             
             # Oscillation detection and correction
             if bee_index is not None:
@@ -120,6 +130,32 @@ class Move:
             red_dot.position = [next_x, next_y]
             
         return distance
+
+    def check_silver_dot_interactions(self, red_dot, bee_index):
+        """Check if a red dot has interacted with a silver dot"""
+        if not self.silver_dots:
+            return False
+            
+        # Define interaction distance
+        interaction_distance = 0.6
+        
+        # Check distance to each silver dot
+        for i, silver_dot in enumerate(self.silver_dots[:]):  # Use copy to allow removal
+            sx, sy = silver_dot.position
+            rx, ry = red_dot.position
+            
+            distance = math.hypot(sx - rx, sy - ry)
+            
+            if distance < interaction_distance:
+                # Interaction with silver dot occurred
+                changes = red_dot.interact_with_silver()
+                self.log_important_event(bee_index, f"🥈 Interacted with silver dot! Growing larger, moving slower (Size: {changes['new_size']:.2f}, Speed: {changes['new_speed']:.2f})")
+                
+                # Remove the silver dot after interaction
+                self.silver_dots.remove(silver_dot)
+                return True
+                
+        return False
 
     def is_inside_pond(self, x, y):
         px, py = self.pond_position
@@ -214,6 +250,9 @@ class Move:
             # Skip bees that have already settled
             if i in self.settled_dots:
                 continue
+            
+            # Check for interactions with silver dots
+            self.check_silver_dot_interactions(red_dot, i)
                 
             if i in self.returning_dots:
                 # This dot is returning to beehive

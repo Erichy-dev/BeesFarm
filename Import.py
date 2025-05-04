@@ -15,6 +15,10 @@ ROWS = 5
 OFFSET_X = 1.5 * HEX_SIZE
 OFFSET_Y = np.sqrt(3) * HEX_SIZE
 
+# Define simulation speed parameters
+SIMULATION_SPEED = 0.5  # Seconds per frame
+FPS = 5  # Frames per second (determines animation interval)
+
 def create_beehive_view(fig, gs, worker_bee_count):
     # Size of the hexagons
     hex_size = HEX_SIZE
@@ -77,7 +81,8 @@ def create_beehive_view(fig, gs, worker_bee_count):
     # Plot the markers
     circle_markers = []
     for circle_x, circle_y in circle_positions:
-        circle_marker = CircleMarker(circle_x, circle_y)
+        # Initial size is just the default (will be updated when bees interact with silver)
+        circle_marker = CircleMarker(circle_x, circle_y, radius=0.1, color='red')
         circle_marker.plot(ax)
         circle_markers.append(circle_marker)
         
@@ -98,10 +103,13 @@ def create_beehive_view(fig, gs, worker_bee_count):
     
     # Set text elements at the top of the visualization
     bee_status_text = ax.text(0.05, 0.02, f"Worker Bees: {circle_count}", transform=ax.transAxes, color='red', fontweight='bold')
-    timestamp_text = ax.text(0.4, 0.02, "Timestamp: 0", transform=ax.transAxes)
+    timestamp_text = ax.text(0.4, 0.02, "Time: 0.0 seconds", transform=ax.transAxes)
     nectar_text = ax.text(0.7, 0.02, "Nectar Collected: 0", transform=ax.transAxes, color='darkorange', fontweight='bold')
     
-    return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text
+    # Add status text for bee sizes
+    bee_sizes_text = ax.text(0.05, 0.06, "Bee Sizes: Normal", transform=ax.transAxes, color='purple', fontweight='bold')
+    
+    return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text, bee_sizes_text
 
 def ensure_gold_dots_at_spawn_points(landscape_objects):
     """
@@ -161,7 +169,7 @@ def main():
     gs = GridSpec(1, 2, width_ratios=[1, 1])
     
     # Create beehive visualization with the correct number of worker bees
-    beehive_ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text = create_beehive_view(fig, gs, num_red_dots)
+    beehive_ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text, bee_sizes_text = create_beehive_view(fig, gs, num_red_dots)
     
     # Initialize the landscape grid and environment
     landscape = Landscape(block_size=15, max_gold_collected=20, num_houses=num_houses)
@@ -184,14 +192,15 @@ def main():
         max_gold_collected=landscape.max_gold_collected,
         pond_position=(12, 5),
         pond_size=(3, 5),
-        forbidden_zone_func=landscape.is_inside_forbidden_zone
+        forbidden_zone_func=landscape.is_inside_forbidden_zone,
+        silver_dots=landscape.objects.silver_dots  # Pass silver dots for interaction
     )
 
     # Show landscape initially
     landscape.display(fig=fig, subplot_spec=gs[0, 1], title=f"Landscape with {num_red_dots} Worker Bees")
     
-    # Track animation frame
-    frame_count = [0]
+    # Track simulation time
+    simulation_time = [0.0]  # In seconds
     
     # Create static list of artists to avoid flickering
     all_artists = []
@@ -218,6 +227,7 @@ def main():
     all_artists.append(timestamp_text)
     all_artists.append(nectar_text)
     all_artists.append(bee_status_text)
+    all_artists.append(bee_sizes_text)
     
     # Last nectar count to detect changes
     last_nectar_count = 0
@@ -227,7 +237,9 @@ def main():
     def update(frame):
         nonlocal last_nectar_count, is_nectar_exhausted
         
-        frame_count[0] += 1
+        # Update simulation time (in seconds)
+        simulation_time[0] += SIMULATION_SPEED
+        formatted_time = f"{simulation_time[0]:.1f}"
         
         # Update landscape simulation
         if landscape.movement and not landscape.movement.completed:
@@ -260,7 +272,11 @@ def main():
                     is_nectar_exhausted = True
             
             # Always update timestamp and bee positions
-            timestamp_text.set_text(f"Timestamp: {frame_count[0]}")
+            timestamp_text.set_text(f"Time: {formatted_time} seconds")
+            
+            # Track bee sizes for reporting
+            bee_size_changes = False
+            max_bee_size = 0.1  # Default bee size
             
             # Update circle marker positions to match red dots
             for i, red_dot in enumerate(landscape.objects.red_dots):
@@ -269,6 +285,28 @@ def main():
                     beehive_x = (red_dot.position[0] / landscape.block_size) * (COLS * OFFSET_X * 0.8)
                     beehive_y = (red_dot.position[1] / landscape.block_size) * (ROWS * OFFSET_Y * 0.8)
                     circle_markers[i].move(beehive_x, beehive_y)
+                    
+                    # Update the size of the circle based on silver dot interactions
+                    if hasattr(red_dot, 'current_size'):
+                        max_bee_size = max(max_bee_size, red_dot.current_size)
+                        
+                        if red_dot.current_size != circle_markers[i].radius:
+                            bee_size_changes = True
+                            # Create a new circle with the updated size
+                            if circle_markers[i].circle:
+                                circle_markers[i].radius = red_dot.current_size
+                                circle_markers[i].circle.set_radius(red_dot.current_size)
+                                
+                                # Also change color to indicate the increased power
+                                intensity = (red_dot.current_size - 0.1) / 0.25  # Normalize to 0-1 range
+                                new_color = (1.0, max(0, 1.0 - intensity), max(0, 1.0 - intensity))  # Red to more saturated red
+                                circle_markers[i].circle.set_facecolor(new_color)
+            
+            # Update the bee sizes text
+            if max_bee_size > 0.1:
+                bee_sizes_text.set_text(f"Bee Growth: {int((max_bee_size/0.1 - 1) * 100)}% Larger")
+            else:
+                bee_sizes_text.set_text("Bee Sizes: Normal")
         
         # Always return the same list of artists to prevent blinking
         return all_artists
@@ -278,7 +316,7 @@ def main():
         fig, 
         update, 
         frames=1000,
-        interval=200,
+        interval=1000/FPS,  # Convert FPS to milliseconds between frames
         blit=True,  # Re-enable blitting but with proper artist management
         repeat=False
     )
