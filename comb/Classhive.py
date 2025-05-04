@@ -17,10 +17,12 @@ class CircleMarker:
         self.radius = radius
         self.color = color
         self.circle = None  # Store the circle object
+        self.visible = True  # Track visibility state
 
     def plot(self, ax):
         """Plots the circle marker on the given axis."""
         self.circle = plt.Circle((self.x, self.y), self.radius, color=self.color)
+        self.circle.set_visible(self.visible)  # Set initial visibility
         ax.add_artist(self.circle)
         
     def move(self, new_x, new_y):
@@ -29,6 +31,25 @@ class CircleMarker:
         self.y = new_y
         if self.circle:
             self.circle.set_center((self.x, self.y))
+    
+    def show(self):
+        """Make the circle visible."""
+        if self.circle and not self.visible:
+            self.circle.set_visible(True)
+            self.visible = True
+    
+    def hide(self):
+        """Make the circle invisible."""
+        if self.circle and self.visible:
+            self.circle.set_visible(False)
+            self.visible = False
+            
+    def set_visibility(self, is_visible):
+        """Set the visibility state of the circle."""
+        if is_visible:
+            self.show()
+        else:
+            self.hide()
 
 # Simpler placeholder classes for other markers (not used in the simplified version)
 class TriangleMarker:

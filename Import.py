@@ -502,13 +502,59 @@ def main():
             bee_size_changes = False
             max_bee_size = 0.1  # Default bee size
             
+            # Get the beehive position for checking if bees are in/near the hive
+            hive_x, hive_y = landscape.objects.beehive["position"]
+            hive_width = landscape.objects.beehive["width"]
+            hive_height = landscape.objects.beehive["height"]
+            
+            # Beehive position from movement logic
+            movement_beehive_position = landscape.movement.beehive_position
+            
             # Update circle marker positions to match red dots
             for i, red_dot in enumerate(landscape.objects.red_dots):
                 if i < len(circle_markers):
-                    # Map the positions from landscape to beehive
-                    beehive_x = (red_dot.position[0] / landscape.block_size) * (COLS * OFFSET_X * 0.8)
-                    beehive_y = (red_dot.position[1] / landscape.block_size) * (ROWS * OFFSET_Y * 0.8)
-                    circle_markers[i].move(beehive_x, beehive_y)
+                    # Check if the bee is in or very near the hive
+                    x, y = red_dot.position
+                    
+                    # Calculate distance to hive
+                    dist_to_hive = distance(
+                        (x, y),
+                        movement_beehive_position
+                    )
+                    
+                    # Define threshold for being "in" the hive
+                    hive_threshold = 1.0  # Units from hive center
+                    
+                    # Alternative check: see if bee is inside the hive rectangle or very close to it
+                    in_hive_rect = (
+                        hive_x <= x <= hive_x + hive_width and
+                        hive_y <= y <= hive_y + hive_height
+                    )
+                    
+                    near_hive = dist_to_hive <= hive_threshold or in_hive_rect
+                    
+                    # Also check if this bee is in the settled_dots set
+                    is_settled = i in landscape.movement.settled_dots
+                    
+                    # Set visibility based on bee location
+                    if near_hive or is_settled:
+                        # The bee is in/near the hive, make it visible in the beehive visualization
+                        circle_markers[i].show()
+                        
+                        # Map the positions from landscape to beehive
+                        beehive_x = (red_dot.position[0] / landscape.block_size) * (COLS * OFFSET_X * 0.8)
+                        beehive_y = (red_dot.position[1] / landscape.block_size) * (ROWS * OFFSET_Y * 0.8)
+                        circle_markers[i].move(beehive_x, beehive_y)
+                        
+                        # Debug output for visibility
+                        if frame % 20 == 0:  # Reduce spam
+                            print(f"[DEBUG] Bee #{i+1} is in/near hive at {red_dot.position}, showing in comb")
+                    else:
+                        # The bee is not in the hive, hide it in the beehive visualization
+                        circle_markers[i].hide()
+                        
+                        if frame % 20 == 0:  # Reduce spam
+                            print(f"[DEBUG] Bee #{i+1} is outside hive at {red_dot.position}, hiding from comb")
                     
                     # Update the size of the circle based on silver dot interactions
                     if hasattr(red_dot, 'current_size'):

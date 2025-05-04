@@ -81,6 +81,8 @@ def create_beehive_visualization(num_bees=3, max_nectar=20, fig=None, subplot=No
         # Create a marker representing a bee
         circle_marker = CircleMarker(x, y, radius=0.1, color='red')  # Match original radius
         circle_marker.plot(ax)
+        # Initially hide the markers since bees start outside the hive
+        circle_marker.hide()
         circle_markers.append(circle_marker)
     
     # Return all the elements needed for later updates
