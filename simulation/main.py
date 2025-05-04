@@ -1,211 +1,15 @@
-# --- Import.py ---
-from Class1 import Landscape
-from Class3 import Move
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-import numpy as np
-import random
 import matplotlib.animation as animation
-import time  # For tracking real elapsed time
-from comb.Classhive import CircleMarker, TriangleMarker, RectangleMarker, hexagon
-from comb.Beehive import create_beehive_visualization, update_nectar_level
+import time
+import random
+import numpy as np
+from matplotlib.gridspec import GridSpec
 
-# Define constant parameters for the hexagon grid
-HEX_SIZE = 1
-COLS = 10
-ROWS = 5
-OFFSET_X = 1.5 * HEX_SIZE
-OFFSET_Y = np.sqrt(3) * HEX_SIZE
-
-# Define simulation speed parameters
-FPS = 5  # Frames per second (determines animation interval)
-SIMULATION_SPEED = 1.0/FPS  # Seconds per frame - synchronized with FPS for real-time accuracy
-
-# Define the waiting period between nectar cycles (in seconds)
-WAIT_BETWEEN_CYCLES = 10.0  # Increased from 5 to 10 seconds
-
-# Add a debug flag to control verbosity through the whole program:
-debug_verbose = False  # Set to True to see all debug messages
-
-def create_beehive_view(fig, gs, worker_bee_count):
-    """
-    Create the beehive visualization using the new simplified version.
-    This is a wrapper around the create_beehive_visualization function.
-    """
-    # Use our new visualization function from comb/Beehive.py
-    ax, hexagon_grid, circle_markers, nectar_status, bee_status = create_beehive_visualization(
-        fig=fig,
-        subplot=gs[0, 0],
-        num_bees=worker_bee_count,
-        max_nectar=20  # Maximum nectar per cycle
-    )
-    
-    # Position text in the extra space below the hexagons (data coordinates)
-    # Add status text for bee sizes at the top
-    max_x = 10 * 1.5  # COLS * OFFSET_X from Beehive.py
-    
-    bee_sizes_text = ax.text(max_x/2 - 2, -1.5, "Bee Growth: Normal", 
-                           color='purple', fontweight='bold', fontsize=12,
-                             horizontalalignment='center')
-    
-    timestamp_text = ax.text(max_x/2 - 2, -5, "Time: 0.0 seconds", fontsize=12,
-                           horizontalalignment='center')
-    
-    # Create a box for the total counter
-    total_box = plt.Rectangle((0, -9), max_x, 1.3, facecolor='honeydew', 
-                             edgecolor='forestgreen', alpha=0.8, transform=ax.transData)
-    ax.add_patch(total_box)
-    
-    # Add the prominent text for total nectar
-    total_nectar_text = ax.text(max_x/2, -8.5, "Total Nectar: 0", 
-                             color='darkgreen', fontweight='bold', fontsize=16,
-                             horizontalalignment='center', verticalalignment='center')
-    
-    # Create empty placeholder lists for compatibility with existing code
-    triangle_markers = []
-    square_markers = []
-    
-    return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status, timestamp_text, nectar_status, bee_sizes_text, total_nectar_text, total_box
-
-def ensure_gold_dots_at_spawn_points(landscape_objects):
-    """
-    Ensures that nectar is accessible on flowers.
-    This function adds additional gold dots to flower areas if necessary to ensure bees can find nectar.
-    """
-    # If we already have enough gold dots, don't add more
-    min_required_dots = 5
-    if len(landscape_objects.gold_dots) >= min_required_dots:
-        return
-        
-    # Define flower areas where nectar can spawn
-    flower_areas = [
-        {"position": (4, 7), "width": 3, "height": 3, "name": "Center Flowers"},  # Center flower area
-        {"position": (7, 4), "width": 3, "height": 3, "name": "Right Flowers"},   # Right flowers
-        {"position": (1, 4), "width": 3, "height": 3, "name": "Left Flowers"},    # Left flowers
-        {"position": (7, 11), "width": 3, "height": 3, "name": "Top Flowers"},    # Top flowers
-        {"position": (1, 11), "width": 3, "height": 3, "name": "Upper Left Flowers"}, # Upper left flowers
-    ]
-    
-    # Define forbidden zone - circular area centered at (5.5, 8.5) with radius 1.5
-    forbidden_center_x = 5.5
-    forbidden_center_y = 8.5
-    forbidden_radius = 1.5
-    
-    # Helper function to check if a point is in the forbidden zone
-    def is_in_forbidden_zone(x, y):
-        distance = ((x - forbidden_center_x) ** 2 + (y - forbidden_center_y) ** 2) ** 0.5
-        return distance <= forbidden_radius
-    
-    # Shuffle the flower areas to add randomness
-    random.shuffle(flower_areas)
-    
-    # Count how many more dots we need
-    dots_to_add = min_required_dots - len(landscape_objects.gold_dots)
-    
-    # Add dots to random flower areas until we have enough
-    for area in flower_areas:
-        if dots_to_add <= 0:
-            break
-            
-        x0, y0 = area["position"]
-        width, height = area["width"], area["height"]
-        
-        # Try multiple times to find a valid position
-        max_attempts = 10
-        for attempt in range(max_attempts):
-            # Generate a random position within the flower area
-            dot_x = x0 + random.randint(0, width-1) + 0.5
-            dot_y = y0 + random.randint(0, height-1) + 0.5
-            
-            # Check if this position is in the forbidden zone
-            if not is_in_forbidden_zone(dot_x, dot_y):
-                # Valid position found
-                print(f"Adding nectar to ensure accessibility on {area['name']} at ({dot_x}, {dot_y})")
-                from Class2 import CircleDot
-                alliance_dot = CircleDot((dot_x, dot_y))
-                landscape_objects.gold_dots.append(alliance_dot)
-                dots_to_add -= 1
-                break
-                
-            if attempt == max_attempts - 1:
-                print(f"⚠️ WARNING: Could not find valid position for nectar in {area['name']} after {max_attempts} attempts")
-
-def regenerate_nectar(landscape, cycle_count, total_nectar):
-    """
-    Regenerate nectar for the next collection cycle
-    """
-    # Don't increment total here - it's already being done in the update function
-    # before this function is called
-    
-    # Clear existing gold dots and reset the counter
-    landscape.objects.gold_dots = []
-    landscape.movement.gold_dots = []
-    
-    # Clear silver dots to regenerate them
-    landscape.objects.silver_dots = []
-    landscape.movement.silver_dots = []
-    
-    # Use the reset method in the Move class
-    landscape.movement.reset_for_new_cycle()
-    
-    # Generate new gold dots - increase count for more variety (8-12 dots)
-    nectar_count = random.randint(8, 12)
-    landscape.objects.add_gold_dots(count=nectar_count)
-    
-    # Generate new silver dots for this cycle
-    landscape.objects.add_silver_dots()
-    
-    # Ensure there's enough accessible nectar
-    ensure_gold_dots_at_spawn_points(landscape.objects)
-    
-    # Update the movement logic to use the new gold dots and silver dots
-    landscape.movement.gold_dots = landscape.objects.gold_dots
-    landscape.movement.silver_dots = landscape.objects.silver_dots
-    
-    # Reset bee positions to near the hive to start the new cycle
-    reset_bee_positions(landscape, reset_attributes=True)
-    
-    print(f"\n🌱 NECTAR REGENERATED - Starting cycle {cycle_count} (Total nectar so far: {total_nectar})")
-    print(f"    - {len(landscape.objects.gold_dots)} gold nectar points generated")
-    print(f"    - {len(landscape.objects.silver_dots)} silver power-ups generated")
-    return landscape, total_nectar
-
-def reset_bee_positions(landscape, reset_attributes=False):
-    """
-    Reset bee positions to near the hive to start a new collection cycle
-    If reset_attributes is True, also reset bee size and speed to normal
-    """
-    hive_x, hive_y = landscape.objects.beehive["position"]
-    hive_width = landscape.objects.beehive["width"]
-    hive_height = landscape.objects.beehive["height"]
-    
-    for i, bee in enumerate(landscape.objects.red_dots):
-        # Position just outside the hive with some randomness
-        x_offset = random.uniform(0.5, 1.5)
-        y_offset = random.uniform(0.5, 1.5)
-        
-        # Position around the hive
-        position_side = i % 4  # 0: right, 1: top, 2: left, 3: bottom
-        
-        if position_side == 0:  # right side
-            bee.position = [hive_x + hive_width + x_offset, hive_y + random.uniform(0, hive_height)]
-        elif position_side == 1:  # top
-            bee.position = [hive_x + random.uniform(0, hive_width), hive_y + hive_height + y_offset]
-        elif position_side == 2:  # left side
-            bee.position = [hive_x - x_offset, hive_y + random.uniform(0, hive_height)]
-        else:  # bottom
-            bee.position = [hive_x + random.uniform(0, hive_width), hive_y - y_offset]
-            
-        # Reset bee attributes if requested
-        if reset_attributes and hasattr(bee, 'original_size'):
-            # Reset size to original
-            bee.current_size = bee.original_size
-            # Reset speed to normal
-            bee.speed_modifier = 1.0
-            # Reset silver interaction counter to allow growth in the new cycle
-            bee.silver_interactions = 0
-            
-            print(f"Reset bee #{i+1} attributes to normal (size: {bee.current_size}, speed: {bee.speed_modifier})")
+from visualization.hive_view import create_beehive_view, update_nectar_level
+from entities.landscape import Landscape
+from movement.movement import Move
+from utils.helpers import ensure_gold_dots_at_spawn_points, regenerate_nectar, reset_bee_positions
+from utils.constants import FPS, WAIT_BETWEEN_CYCLES, DEBUG_VERBOSE, COLS, ROWS, OFFSET_X, OFFSET_Y
 
 def main():
     try:
@@ -257,10 +61,6 @@ def main():
     
     # Track real time when animation starts
     start_time = time.time()
-    
-    # Simulation completion flag (separate from landscape.movement.completed)
-    # Remove final_time variable as we never want the simulation to be marked as "COMPLETED"
-    simulation_completed = False
     
     # Create static list of artists to avoid flickering
     all_artists = []
@@ -323,7 +123,7 @@ def main():
     # A function to print focused debug information about bee placement
     def debug_bee_position(message, bee_index=None, position=None, level="INFO"):
         # Only print if it's an important message or we explicitly want verbose logs
-        if level in ["ERROR", "WARNING", "SUCCESS"] or debug_verbose:
+        if level in ["ERROR", "WARNING", "SUCCESS"] or DEBUG_VERBOSE:
             prefix = ""
             if level == "ERROR":
                 prefix = "🚨 ERROR: "
@@ -387,7 +187,7 @@ def main():
     def update(frame):
         nonlocal last_nectar_count, is_nectar_exhausted, nectar_cycle_count
         nonlocal waiting_for_next_cycle, cycle_complete_time, total_nectar_collected
-        nonlocal landscape, simulation_completed
+        nonlocal landscape
         nonlocal bee_comb_positions, bee_entrance_animations, bees_in_hive_prev, bees_in_hive_current
         
         # Track timing to reduce debug frequency
@@ -399,12 +199,6 @@ def main():
         # Get real elapsed time for accurate timing
         elapsed_time = time.time() - start_time
         formatted_time = f"{elapsed_time:.1f}"
-        
-        # Note: we never permanently mark the simulation as completed
-        # so this block should never execute
-        if simulation_completed:
-            timestamp_text.set_text(f"Time: {formatted_time} seconds")
-            return all_artists
         
         # If we're in the waiting period between cycles
         if waiting_for_next_cycle:
@@ -464,15 +258,6 @@ def main():
                 # Reset bee size text
                 bee_sizes_text.set_text("Bee Growth: Normal")
                 
-                # Also update this for cycle completion:
-                if (simulation_should_complete or movement_completed) and not waiting_for_next_cycle:
-                    # Cycle is complete, enter waiting state
-                    print(f"\n🍯 NECTAR CYCLE {nectar_cycle_count} COMPLETED with {landscape.movement.gold_collected} nectar")
-                    print(f"Total nectar so far: {total_nectar_collected + landscape.movement.gold_collected}")
-                    
-                    waiting_for_next_cycle = True
-                    cycle_complete_time = time.time()
-                
                 return all_artists
         
         # Check for completion directly
@@ -514,8 +299,6 @@ def main():
                     nectar_cycle_count,              # Current cycle 
                     nectar_status
                 )
-                
-                # We don't need to set nectar_status text here, as the update_nectar_level function now does it
                 
                 # Update total nectar text
                 total_nectar_text.set_text(f"TOTAL NECTAR: {total_nectar_collected + gold_collected}")
@@ -782,6 +565,6 @@ def main():
         # Print any error that occurs during animation
         print(f"Error during animation: {e}")
         print(f"Total nectar collected: {total_nectar_collected}")
-        
+
 if __name__ == "__main__":
-    main()
+    main() 
