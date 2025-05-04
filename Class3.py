@@ -2,6 +2,9 @@
 import math
 import random  # Add random for logging with unique IDs
 
+# Debug verbosity control
+DEBUG_VERBOSE = False  # Set to True for verbose output
+
 class Move:
     def __init__(self, red_dots, gold_dots, beehive_position, max_gold_collected, pond_position, pond_size, forbidden_zone_func=None, silver_dots=None):
         self.red_dots = red_dots  # Now a list of red dots
@@ -60,6 +63,10 @@ class Move:
     
     def log_important_event(self, bee_index, message):
         """Log only important events to reduce output but maintain visibility"""
+        # Only log events that are truly important, or if verbose mode is enabled
+        if not DEBUG_VERBOSE and "🥈" in message:  # Silver interaction logs
+            return  # Skip silver interactions unless verbose
+            
         bee_id = self.bee_ids.get(bee_index, f"Bee-{bee_index}")
         print(f"{bee_id}: {message}")
 
@@ -77,7 +84,8 @@ class Move:
                     
                     if self.oscillation_count[bee_index] >= 3:  # Consecutive oscillations detected
                         bee_id = self.bee_ids.get(bee_index, f"Bee-{bee_index}")
-                        print(f"⚠️ {bee_id} oscillation detected! Breaking cycle with random movement")
+                        if DEBUG_VERBOSE:  # Only log if verbose
+                            print(f"⚠️ {bee_id} oscillation detected! Breaking cycle with random movement")
                         self.oscillation_count[bee_index] = 0  # Reset counter
                         return True
                     return False
@@ -231,7 +239,7 @@ class Move:
             self.returning_dots.remove(bee_index)
         
         self.settled_dots.add(bee_index)
-        self.log_important_event(bee_index, "🏠 Settled in the hive (no more nectar available)")
+        self.log_important_event(bee_index, "🏠 Settled in the hive")  # Simplified message
 
     def update_state(self):
         if self.completed:

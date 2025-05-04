@@ -115,8 +115,18 @@ def update_nectar_level(hexagon_grid, current_nectar, max_nectar_per_cycle, tota
     # Calculate the darkness level (0 to 1)
     darkness_level = min(1.0, total_nectar / max_expected_nectar)
     
-    # Print debug info about the color changes
-    print(f"DEBUG: Total nectar: {total_nectar}, Darkness level: {darkness_level:.2f}")
+    # Only print debug info very occasionally to reduce noise
+    # Use a static variable to track when we last printed
+    if not hasattr(update_nectar_level, '_last_printed_nectar'):
+        update_nectar_level._last_printed_nectar = -1
+    
+    # Only log when nectar amount has changed AND it's a significant change
+    if total_nectar != update_nectar_level._last_printed_nectar and (
+        total_nectar % 10 == 0 or  # Print on multiples of 10
+        total_nectar - update_nectar_level._last_printed_nectar >= 10  # Or every 10 increase
+    ):
+        print(f"[NECTAR] Total: {total_nectar}, Darkness: {darkness_level:.2f}")
+        update_nectar_level._last_printed_nectar = total_nectar
     
     # Calculate color based on nectar level - MORE dramatic shift from light to dark gold
     # Start with a very light color (r=1.0, g=0.98, b=0.9)
