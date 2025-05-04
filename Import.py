@@ -34,6 +34,16 @@ def create_beehive_view(fig, gs, worker_bee_count):
     # Create subplot for beehive
     ax = fig.add_subplot(gs[0, 0])
     ax.set_aspect('equal')
+    
+    # Adjust axis limits to create more space for text
+    # Calculate the max extent of the hexagon grid
+    max_x = cols * offset_x
+    max_y = rows * offset_y + offset_y/2
+    
+    # Set extended limits with extra padding at bottom for text
+    ax.set_xlim(-1, max_x + 1)
+    ax.set_ylim(-8, max_y + 1)  # Extra space at bottom for text (increased from -4 to -8)
+    
     ax.axis('off')  # Turn off all axes, spines, and ticks
     
     # Initialize counts for the markers
@@ -100,15 +110,25 @@ def create_beehive_view(fig, gs, worker_bee_count):
         square_markers.append(square_marker)
     
     # Add a title for the beehive view
-    ax.set_title("Beehive Visualization", fontsize=14)
+    ax.set_title("Beehive Visualization", fontsize=14, pad=15)
     
-    # Set text elements at the top of the visualization
-    bee_status_text = ax.text(0.05, 0.02, f"Worker Bees: {circle_count}", transform=ax.transAxes, color='red', fontweight='bold')
-    timestamp_text = ax.text(0.4, 0.02, "Time: 0.0 seconds", transform=ax.transAxes)
-    nectar_text = ax.text(0.7, 0.02, "Nectar Collected: 0", transform=ax.transAxes, color='darkorange', fontweight='bold')
+    # Position text in the extra space below the hexagons (using data coordinates, not axes coordinates)
+    # Add status text for bee sizes at the top
+    bee_sizes_text = ax.text(max_x/2 - 2, -1.5, "Bee Growth: Normal", 
+                           color='purple', fontweight='bold', fontsize=12,
+                           horizontalalignment='center')
     
-    # Add status text for bee sizes
-    bee_sizes_text = ax.text(0.05, 0.06, "Bee Sizes: Normal", transform=ax.transAxes, color='purple', fontweight='bold')
+    # Position the other three texts below the Bee Growth text, one per line
+    bee_status_text = ax.text(max_x/2 - 2, -3, f"Worker Bees: {circle_count}", 
+                             color='red', fontweight='bold', fontsize=12,
+                             horizontalalignment='center')
+    
+    timestamp_text = ax.text(max_x/2 - 2, -5, "Time: 0.0 seconds", fontsize=12,
+                           horizontalalignment='center')
+    
+    nectar_text = ax.text(max_x/2 - 2, -7, "Nectar Collected: 0", 
+                         color='darkorange', fontweight='bold', fontsize=12,
+                         horizontalalignment='center')
     
     return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status_text, timestamp_text, nectar_text, bee_sizes_text
 
@@ -307,7 +327,7 @@ def main():
             if max_bee_size > 0.1:
                 bee_sizes_text.set_text(f"Bee Growth: {int((max_bee_size/0.1 - 1) * 100)}% Larger")
             else:
-                bee_sizes_text.set_text("Bee Sizes: Normal")
+                bee_sizes_text.set_text("Bee Growth: Normal")
         
         # Always return the same list of artists to prevent blinking
         return all_artists
@@ -322,7 +342,7 @@ def main():
         repeat=False
     )
     
-    # Display the combined figure
+    # Display the combined figure with right plot margin for annotations
     plt.tight_layout()
     plt.show()
 
