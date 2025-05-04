@@ -109,16 +109,133 @@ class Object:
         return CircleDot((dot_x + 0.5, dot_y + 0.5))
 
     def add_gold_dots(self, count=10):
-        spawn_areas = [
-            {"position": (1, 4), "width": 3, "height": 3},
-            {"position": (1, 11), "width": 3, "height": 3},
-            {"position": (7, 4), "width": 3, "height": 3},
-            {"position": (7, 11), "width": 3, "height": 3}
+        # Define flower areas where nectar can spawn
+        flower_areas = [
+            {"position": (4, 7), "width": 3, "height": 3, "name": "Center Flowers"},  # Center flower area
+            {"position": (7, 4), "width": 3, "height": 3, "name": "Right Flowers"},   # Right flowers
+            {"position": (1, 4), "width": 3, "height": 3, "name": "Left Flowers"},    # Left flowers
+            {"position": (7, 11), "width": 3, "height": 3, "name": "Top Flowers"},    # Top flowers
+            {"position": (1, 11), "width": 3, "height": 3, "name": "Upper Left Flowers"}, # Upper left flowers
         ]
-        for area in spawn_areas:
+        
+        # Define forbidden zone - circular area centered at (5.5, 8.5) with radius 1.5
+        forbidden_center_x = 5.5
+        forbidden_center_y = 8.5
+        forbidden_radius = 1.5
+        
+        # Helper function to check if a point is in the forbidden zone
+        def is_in_forbidden_zone(x, y):
+            distance = ((x - forbidden_center_x) ** 2 + (y - forbidden_center_y) ** 2) ** 0.5
+            return distance <= forbidden_radius
+        
+        # Log flower locations for debugging
+        print("\n🌸 Flower areas where nectar can generate:")
+        for i, area in enumerate(flower_areas):
             x0, y0 = area["position"]
-            for _ in range(random.randint(1, 5)):
-                self.gold_dots.append(self._generate_gold_dot(x0, y0, area["width"], area["height"]))
+            width, height = area["width"], area["height"]
+            # Check for any overlap with forbidden zone
+            has_overlap = False
+            for check_x in range(x0, x0 + width + 1):
+                for check_y in range(y0, y0 + height + 1):
+                    if is_in_forbidden_zone(check_x, check_y):
+                        has_overlap = True
+                        break
+                if has_overlap:
+                    break
+                
+            overlap_status = "⚠️ WARNING: overlaps with forbidden zone" if has_overlap else "OK"
+            print(f"  {i+1}. {area['name']} at position {area['position']} (width: {area['width']}, height: {area['height']}) - {overlap_status}")
+        
+        # Keep track of flowers that generated nectar
+        flowers_with_nectar = []
+        
+        # Randomly select which flowers will have nectar
+        # Shuffle the flower areas to add randomness
+        random.shuffle(flower_areas)
+        
+        # Determine how many flowers will have nectar (at least 1, at most all)
+        flowers_with_nectar_count = min(count, len(flower_areas))
+        flowers_with_nectar_count = max(1, flowers_with_nectar_count)
+        
+        # Generate nectar at selected flower locations
+        dots_to_generate = count
+        flowers_used = flower_areas[:flowers_with_nectar_count]
+        
+        # First, ensure each selected flower has at least one nectar
+        for area in flowers_used:
+            x0, y0 = area["position"]
+            width, height = area["width"], area["height"]
+            
+            # Try multiple times to find a valid position
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                # Generate a random position within the flower area
+                dot_x = x0 + random.randint(0, width - 1) + 0.5
+                dot_y = y0 + random.randint(0, height - 1) + 0.5
+                
+                # Check if this position is in the forbidden zone
+                if not is_in_forbidden_zone(dot_x, dot_y):
+                    # Valid position found
+                    self.gold_dots.append(CircleDot((dot_x, dot_y)))
+                    dots_to_generate -= 1
+                    flowers_with_nectar.append(area["name"])
+                    break
+                
+                if attempt == max_attempts - 1:
+                    print(f"⚠️ WARNING: Could not find valid position for nectar in {area['name']} after {max_attempts} attempts")
+        
+        # Distribute remaining nectar among the selected flowers
+        while dots_to_generate > 0:
+            # Pick a random flower from the selected ones
+            area = random.choice(flowers_used)
+            x0, y0 = area["position"]
+            width, height = area["width"], area["height"]
+            
+            # Try multiple times to find a valid position
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                # Generate a random position within the flower area
+                dot_x = x0 + random.randint(0, width - 1) + 0.5
+                dot_y = y0 + random.randint(0, height - 1) + 0.5
+                
+                # Check if this position is in the forbidden zone
+                if not is_in_forbidden_zone(dot_x, dot_y):
+                    # Valid position found
+                    self.gold_dots.append(CircleDot((dot_x, dot_y)))
+                    dots_to_generate -= 1
+                    break
+                
+                if attempt == max_attempts - 1:
+                    print(f"⚠️ WARNING: Could not find valid position for nectar in {area['name']} after {max_attempts} attempts")
+                    # Skip this dot if we can't find a valid position
+                    dots_to_generate -= 1
+        
+        # Log which flowers generated nectar and how many
+        print("\n🍯 Nectar generation results:")
+        nectar_counts = {}
+        for dot in self.gold_dots:
+            x, y = dot.position
+            # Check that this dot is not in the forbidden zone
+            if is_in_forbidden_zone(x, y):
+                print(f"⚠️ ERROR: Nectar point at {dot.position} is in the forbidden zone!")
+                continue
+            
+            for area in flower_areas:
+                x0, y0 = area["position"]
+                width, height = area["width"], area["height"]
+                if (x0 <= x <= x0 + width) and (y0 <= y <= y0 + height):
+                    if area["name"] not in nectar_counts:
+                        nectar_counts[area["name"]] = 0
+                    nectar_counts[area["name"]] += 1
+                    break
+        
+        # Print results
+        for name, count in nectar_counts.items():
+            print(f"  - {name}: {count} nectar points")
+        
+        print(f"  Total: {len(self.gold_dots)} nectar points generated across {len(nectar_counts)} flower areas")
+        
+        return self.gold_dots
 
     def add_silver_dots(self):
         # Define the excluded spawn areas

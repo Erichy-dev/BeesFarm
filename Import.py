@@ -148,43 +148,66 @@ def create_beehive_view(fig, gs, worker_bee_count):
 
 def ensure_gold_dots_at_spawn_points(landscape_objects):
     """
-    Ensures that each spawn point has at least one gold dot (alliance).
-    This function checks if there are gold dots in each spawn area and 
-    adds one if none are found.
+    Ensures that nectar is accessible on flowers.
+    This function adds additional gold dots to flower areas if necessary to ensure bees can find nectar.
     """
-    spawn_areas = [
-        {"position": (1, 4), "width": 3, "height": 3},
-        {"position": (1, 11), "width": 3, "height": 3},
-        {"position": (7, 4), "width": 3, "height": 3},
-        {"position": (7, 11), "width": 3, "height": 3}
+    # If we already have enough gold dots, don't add more
+    min_required_dots = 5
+    if len(landscape_objects.gold_dots) >= min_required_dots:
+        return
+        
+    # Define flower areas where nectar can spawn
+    flower_areas = [
+        {"position": (4, 7), "width": 3, "height": 3, "name": "Center Flowers"},  # Center flower area
+        {"position": (7, 4), "width": 3, "height": 3, "name": "Right Flowers"},   # Right flowers
+        {"position": (1, 4), "width": 3, "height": 3, "name": "Left Flowers"},    # Left flowers
+        {"position": (7, 11), "width": 3, "height": 3, "name": "Top Flowers"},    # Top flowers
+        {"position": (1, 11), "width": 3, "height": 3, "name": "Upper Left Flowers"}, # Upper left flowers
     ]
     
-    # Check each spawn area
-    for area in spawn_areas:
+    # Define forbidden zone - circular area centered at (5.5, 8.5) with radius 1.5
+    forbidden_center_x = 5.5
+    forbidden_center_y = 8.5
+    forbidden_radius = 1.5
+    
+    # Helper function to check if a point is in the forbidden zone
+    def is_in_forbidden_zone(x, y):
+        distance = ((x - forbidden_center_x) ** 2 + (y - forbidden_center_y) ** 2) ** 0.5
+        return distance <= forbidden_radius
+    
+    # Shuffle the flower areas to add randomness
+    random.shuffle(flower_areas)
+    
+    # Count how many more dots we need
+    dots_to_add = min_required_dots - len(landscape_objects.gold_dots)
+    
+    # Add dots to random flower areas until we have enough
+    for area in flower_areas:
+        if dots_to_add <= 0:
+            break
+            
         x0, y0 = area["position"]
         width, height = area["width"], area["height"]
         
-        # Define the area boundaries
-        x_min, x_max = x0, x0 + width
-        y_min, y_max = y0, y0 + height
-        
-        # Check if any gold dots are in this area
-        has_gold_in_area = False
-        for gold_dot in landscape_objects.gold_dots:
-            gx, gy = gold_dot.position
-            if x_min <= gx <= x_max and y_min <= gy <= y_max:
-                has_gold_in_area = True
+        # Try multiple times to find a valid position
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            # Generate a random position within the flower area
+            dot_x = x0 + random.randint(0, width-1) + 0.5
+            dot_y = y0 + random.randint(0, height-1) + 0.5
+            
+            # Check if this position is in the forbidden zone
+            if not is_in_forbidden_zone(dot_x, dot_y):
+                # Valid position found
+                print(f"Adding nectar to ensure accessibility on {area['name']} at ({dot_x}, {dot_y})")
+                from Class2 import CircleDot
+                alliance_dot = CircleDot((dot_x, dot_y))
+                landscape_objects.gold_dots.append(alliance_dot)
+                dots_to_add -= 1
                 break
-        
-        # If no gold dots in this area, add one (alliance)
-        if not has_gold_in_area:
-            print(f"Adding alliance (gold nectar) to spawn area at {area['position']}")
-            # Generate a gold dot in the center of the area
-            dot_x = x0 + width // 2
-            dot_y = y0 + height // 2
-            from Class2 import CircleDot
-            alliance_dot = CircleDot((dot_x + 0.5, dot_y + 0.5))
-            landscape_objects.gold_dots.append(alliance_dot)
+                
+            if attempt == max_attempts - 1:
+                print(f"⚠️ WARNING: Could not find valid position for nectar in {area['name']} after {max_attempts} attempts")
 
 def regenerate_nectar(landscape, cycle_count, total_nectar):
     """
@@ -204,13 +227,14 @@ def regenerate_nectar(landscape, cycle_count, total_nectar):
     # Use the reset method in the Move class
     landscape.movement.reset_for_new_cycle()
     
-    # Generate new gold dots
-    landscape.objects.add_gold_dots(count=5)
+    # Generate new gold dots - increase count for more variety (8-12 dots)
+    nectar_count = random.randint(8, 12)
+    landscape.objects.add_gold_dots(count=nectar_count)
     
     # Generate new silver dots for this cycle
     landscape.objects.add_silver_dots()
     
-    # Ensure each spawn point has at least one gold dot
+    # Ensure there's enough accessible nectar
     ensure_gold_dots_at_spawn_points(landscape.objects)
     
     # Update the movement logic to use the new gold dots and silver dots
