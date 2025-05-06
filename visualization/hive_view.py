@@ -2,24 +2,26 @@ import matplotlib.pyplot as plt
 import random
 import numpy as np
 from comb.Classhive import CircleMarker, hexagon
+from comb import QueenBeeDot, DroneDot
 from utils.constants import HEX_SIZE, COLS, ROWS, OFFSET_X, OFFSET_Y
 
 def create_beehive_view(fig, gs, worker_bee_count):
     """
-    Create the beehive visualization using the new simplified version.
-    This is a wrapper around the create_beehive_visualization function.
+    Create the beehive visualization.
     """
     # Use our new visualization function from comb/Beehive.py
     ax, hexagon_grid, circle_markers, nectar_status, bee_status = create_beehive_visualization(
         fig=fig,
         subplot=gs[0, 0],
-        num_bees=worker_bee_count,
-        max_nectar=20  # Maximum nectar per cycle
+        worker_bees=worker_bee_count,
+        max_nectar=20,  # Maximum nectar per cycle
+        drone_bees=4  # Number of drone bees
     )
     
     # Position text in the extra space below the hexagons (data coordinates)
     # Add status text for bee sizes at the top
-    max_x = 10 * 1.5  # COLS * OFFSET_X from Beehive.py
+    max_x = COLS * OFFSET_X
+    max_y = ROWS * OFFSET_Y + OFFSET_Y/2
     
     bee_sizes_text = ax.text(max_x/2 - 2, -1.5, "Bee Growth: Normal", 
                           color='purple', fontweight='bold', fontsize=12,
@@ -45,7 +47,7 @@ def create_beehive_view(fig, gs, worker_bee_count):
     return ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status, timestamp_text, nectar_status, bee_sizes_text, total_nectar_text, total_box
 
 
-def create_beehive_visualization(num_bees=3, max_nectar=20, fig=None, subplot=None):
+def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig=None, subplot=None):
     """
     Creates a simplified beehive visualization with:
     - A hexagonal grid representing the honeycomb
@@ -53,7 +55,8 @@ def create_beehive_visualization(num_bees=3, max_nectar=20, fig=None, subplot=No
     - Starting with a light color to show absence of nectar
     
     Parameters:
-    - num_bees: number of bees to show
+    - worker_bees: number of worker bees to show
+    - drone_bees: number of drone bees to show (queen-drone simulation)
     - max_nectar: maximum nectar that can be collected per cycle (for coloring)
     - fig: existing figure to use (if None, creates a new one)
     - subplot: subplot specification (if None, creates a new figure)
@@ -83,7 +86,7 @@ def create_beehive_visualization(num_bees=3, max_nectar=20, fig=None, subplot=No
                          color='darkorange', fontweight='bold', fontsize=12,
                          horizontalalignment='center')
     
-    bee_status = ax.text(max_x/2 - 2, -3, f"Worker Bees: {num_bees}", 
+    bee_status = ax.text(max_x/2 - 2, -3, f"Worker Bees: {worker_bees}", 
                        color='red', fontweight='bold', fontsize=12,
                        horizontalalignment='center')
     
@@ -109,7 +112,7 @@ def create_beehive_visualization(num_bees=3, max_nectar=20, fig=None, subplot=No
     
     # Create bee markers (initial positions don't matter - will be updated)
     circle_markers = []
-    for _ in range(num_bees):
+    for _ in range(worker_bees):
         # Random initial position near edge of comb
         x = random.uniform(0, max_x)
         y = random.uniform(0, max_y/4)  # Start at bottom quarter
@@ -120,9 +123,146 @@ def create_beehive_visualization(num_bees=3, max_nectar=20, fig=None, subplot=No
         # Initially hide the markers since bees start outside the hive
         circle_marker.hide()
         circle_markers.append(circle_marker)
+
+    # queen-baby-drone simulation
+    if drone_bees > 0:
+        # Store these for later updates in the simulation
+        if not hasattr(create_beehive_visualization, 'simulation_data'):
+            create_beehive_visualization.simulation_data = {}
+        
+        # Create queen bee marker (blue)
+        queen_bee = QueenBeeDot()
+        qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
+        queen_marker = CircleMarker(qx, qy, radius=0.15, color='blue')
+        queen_marker.plot(ax)
+        queen_marker.show()
+        
+        # Create drone bee markers (black)
+        drones = []
+        drone_markers = []
+        for _ in range(drone_bees):
+            drone = DroneDot()
+            drones.append(drone)
+            
+            dx, dy = map_to_beehive(drone.position_x, drone.position_y, max_x, max_y)
+            drone_marker = CircleMarker(dx, dy, radius=0.1, color='black')
+            drone_marker.plot(ax)
+            drone_marker.show()
+            drone_markers.append(drone_marker)
+        
+        # Store the simulation data in a static variable
+        simulation_data = {
+            'ax': ax,
+            'queen_bee': queen_bee,
+            'queen_marker': queen_marker,
+            'drones': drones,
+            'drone_markers': drone_markers,
+            'bee_status': bee_status,
+            'nectar_status': nectar_status,
+            'max_x': max_x,
+            'max_y': max_y,
+            'gold_dots': [],
+            'baby_bees_count': 0,
+            'interaction_radius': 1.5,
+            'random_move_timer': 0
+        }
+        create_beehive_visualization.simulation_data = simulation_data
     
     # Return all the elements needed for later updates
     return ax, hexagon_grid, circle_markers, nectar_status, bee_status
+
+def map_to_beehive(x, y, max_x, max_y):
+    """Map coordinates from the 0-15 range to beehive coordinates"""
+    mapped_x = (x / 15) * max_x
+    mapped_y = (y / 20) * max_y
+    return mapped_x, mapped_y
+
+def update_queen_drone_simulation():
+    """
+    Update the queen and drone simulation for one timestep.
+    This function uses the simulation data stored in create_beehive_visualization.simulation_data
+    to update the queen-drone-baby simulation.
+    
+    Usage:
+    ------
+    Call this function in your animation or update loop to animate the queen-drone interaction.
+    Example:
+        def update():
+            # Update worker bees, nectar, etc.
+            ...
+            # Update queen-drone simulation (no parameters needed)
+            update_queen_drone_simulation()
+            ...
+    """
+    # Check if simulation data exists
+    if not hasattr(create_beehive_visualization, 'simulation_data'):
+        return
+    
+    data = create_beehive_visualization.simulation_data
+    ax = data['ax']
+    queen_bee = data['queen_bee']
+    queen_marker = data['queen_marker']
+    drones = data['drones']
+    drone_markers = data['drone_markers']
+    bee_status = data['bee_status']
+    nectar_status = data['nectar_status']
+    max_x = data['max_x']
+    max_y = data['max_y']
+    
+    # Move queen bee
+    queen_bee.move_randomly(max_delta=0.2)
+    qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
+    queen_marker.move(qx, qy)
+    
+    # Move drones
+    for i, drone in enumerate(drones):
+        marker = drone_markers[i]
+        
+        if drone.state == "approaching":
+            drone.approach_queen(queen_bee.get_position(), max_delta=0.6)
+            if distance_between(drone.get_position(), queen_bee.get_position()) <= data['interaction_radius']:
+                drone.state = "ready_for_gold"
+        elif drone.state == "moving_away":
+            drone.move_away_from_queen(max_delta=0.7)
+        elif drone.state == "waiting":
+            drone.move_randomly(max_delta=0.3)
+        
+        dx, dy = map_to_beehive(drone.position_x, drone.position_y, max_x, max_y)
+        marker.move(dx, dy)
+    
+    # Check if all drones are ready for gold (mating)
+    if all(drone.state == "ready_for_gold" for drone in drones):
+        # Create a baby bee (gold dot)
+        data['baby_bees_count'] += 1
+        queen_x, queen_y = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
+        
+        # Create a gold dot marker for the baby bee
+        gold_dot = plt.Circle((queen_x, queen_y), 0.15, color='gold')
+        ax.add_artist(gold_dot)
+        data['gold_dots'].append(gold_dot)
+        
+        # Update status
+        nectar_status.set_text(f"Mating simulation - Baby Bees: {data['baby_bees_count']}")
+        
+        # Drones move away after mating
+        for drone in drones:
+            drone.queen_reference = queen_bee.get_position()
+            drone.state = "moving_away"
+    
+    # Check if all drones are waiting
+    if all(drone.state == "waiting" for drone in drones):
+        data['random_move_timer'] += 1
+        if data['random_move_timer'] >= 5:
+            for drone in drones:
+                drone.state = "approaching"
+            data['random_move_timer'] = 0
+    
+    # Update bee status text
+    bee_status.set_text(f"Queen Bee (blue) and {len(drones)} Drones (black)")
+
+def distance_between(p1, p2):
+    """Calculate Euclidean distance between two points"""
+    return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
 
 def update_nectar_level(hexagon_grid, current_nectar, max_nectar_per_cycle, total_nectar, cycle_count, nectar_status):
     """
