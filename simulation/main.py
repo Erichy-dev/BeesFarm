@@ -108,6 +108,9 @@ def main():
     waiting_for_next_cycle = False
     cycle_complete_time = None
     
+    # Initialize animation variable
+    ani = None
+    
     # Initialize bee tracking variables together
     # Track bee positions in comb - where they should appear when they're in the hive
     bee_comb_positions = {}  # Dictionary to store bee positions in the comb
@@ -193,7 +196,7 @@ def main():
         nonlocal waiting_for_next_cycle, cycle_complete_time, total_nectar_collected
         nonlocal landscape
         nonlocal bee_comb_positions, bee_entrance_animations, bees_in_hive_prev, bees_in_hive_current
-        nonlocal all_artists
+        nonlocal all_artists, ani
         
         # Track timing to reduce debug frequency
         show_debug = False
@@ -206,7 +209,15 @@ def main():
         formatted_time = f"{elapsed_time:.1f}"
         
         # Update the queen-drone-baby simulation
-        update_queen_drone_simulation()
+        queen_drone_sim_complete = update_queen_drone_simulation()
+        
+        # If the queen-drone simulation is complete, stop the entire animation
+        if queen_drone_sim_complete:
+            print("\n🏁 SIMULATION COMPLETE: Queen-drone simulation reached 100 timesteps.")
+            print(f"Total nectar collected: {total_nectar_collected + landscape.movement.gold_collected}")
+            print(f"Total simulation time: {formatted_time} seconds")
+            ani.event_source.stop()
+            return all_artists
         
         # Add queen, drone, and baby bee markers to all_artists for animation
         # Import the visualization simulation data to access the markers

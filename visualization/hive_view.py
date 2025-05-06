@@ -46,6 +46,10 @@ def create_beehive_view(fig, gs, worker_bee_count, drone_bees=4):
                             color='darkgreen', fontweight='bold', fontsize=16,
                             horizontalalignment='center', verticalalignment='center')
     
+    # Store timestamp_text in the simulation data if it exists
+    if hasattr(create_beehive_visualization, 'simulation_data') and drone_bees > 0:
+        create_beehive_visualization.simulation_data['timestamp_text'] = timestamp_text
+    
     # Create empty placeholder lists for compatibility with existing code
     triangle_markers = []
     square_markers = []
@@ -214,11 +218,15 @@ def update_queen_drone_simulation():
             # Update queen-drone simulation (no parameters needed)
             update_queen_drone_simulation()
             ...
+            
+    Returns:
+    -------
+    simulation_completed: Boolean indicating if the simulation has reached its time limit
     """
     # Check if simulation data exists
     if not hasattr(create_beehive_visualization, 'simulation_data'):
         print("👑🐝 QUEEN-DRONE DEBUG: No simulation data found! Queen-drone simulation not initialized.")
-        return
+        return False
     
     data = create_beehive_visualization.simulation_data
     ax = data['ax']
@@ -231,9 +239,10 @@ def update_queen_drone_simulation():
     max_x = data['max_x']
     max_y = data['max_y']
     
-    # Add a static counter to reduce log frequency
+    # Add a static counter to reduce log frequency and track total timesteps
     if not hasattr(update_queen_drone_simulation, 'frame_counter'):
         update_queen_drone_simulation.frame_counter = 0
+        update_queen_drone_simulation.max_timesteps = 100  # Stop after 100 timesteps
         print("👑🐝 QUEEN-DRONE DEBUG: First simulation update! Queen at", queen_bee.get_position())
         
         # Make sure they're visible with good contrast
@@ -252,6 +261,11 @@ def update_queen_drone_simulation():
     
     update_queen_drone_simulation.frame_counter += 1
     
+    # Check if we've reached the timestep limit
+    if update_queen_drone_simulation.frame_counter >= update_queen_drone_simulation.max_timesteps:
+        print(f"🏁 QUEEN-DRONE SIMULATION COMPLETE: Reached {update_queen_drone_simulation.frame_counter} timesteps")
+        return True
+    
     # Log every 50 frames to avoid console flood
     should_log = update_queen_drone_simulation.frame_counter % 50 == 0
     
@@ -262,6 +276,7 @@ def update_queen_drone_simulation():
     
     if should_log:
         print(f"👑 QUEEN: Moving to ({qx:.1f}, {qy:.1f}) - Original pos: {queen_bee.get_position()}")
+        print(f"⏱️ SIMULATION TIMESTEP: {update_queen_drone_simulation.frame_counter}/{update_queen_drone_simulation.max_timesteps}")
     
     # Count drones in different states
     approaching = 0
@@ -341,6 +356,13 @@ def update_queen_drone_simulation():
         worker_info = current_text.split('|')[0].strip()
         # Update bee status text with queen and drone info
         bee_status.set_text(f"{worker_info} | Queen Bee & {len(drones)} Drones - {data['baby_bees_count']} Babies")
+        
+    # Update timestamp text to show simulation progress
+    if 'timestamp_text' in data:
+        data['timestamp_text'].set_text(f"Simulation: {update_queen_drone_simulation.frame_counter}/{update_queen_drone_simulation.max_timesteps} steps")
+    
+    # Simulation is still running
+    return False
 
 def distance_between(p1, p2):
     """Calculate Euclidean distance between two points"""
