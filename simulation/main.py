@@ -1,3 +1,7 @@
+import matplotlib
+# Set Qt backend before importing pyplot
+matplotlib.use('Qt5Agg')
+
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import time
@@ -5,6 +9,10 @@ import random
 import numpy as np
 from matplotlib.gridspec import GridSpec
 import os
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtWidgets import QApplication
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+import sys
 
 from visualization.hive_view import create_beehive_view, update_nectar_level, update_queen_drone_simulation
 from entities.landscape import Landscape
@@ -12,10 +20,20 @@ from movement.movement import Move
 from utils.helpers import ensure_gold_dots_at_spawn_points, regenerate_nectar, reset_bee_positions
 from utils.constants import FPS, WAIT_BETWEEN_CYCLES, DEBUG_VERBOSE, COLS, ROWS, OFFSET_X, OFFSET_Y
 
+# Screenshot configuration
+ENABLE_SCREENSHOTS = True  # Set to False to disable screenshots
+SCREENSHOT_INTERVAL = 1000  # Screenshot interval in milliseconds (1 second)
+
 # Global variable to track if simulation is complete
 SIMULATION_COMPLETE = False
 
 def main():
+    # Create Qt application
+    if not QApplication.instance():
+        app = QApplication(sys.argv)
+    else:
+        app = QApplication.instance()
+    
     try:
         num_houses = int(input("How many houses do you want (1 to 4)? "))
         if not 1 <= num_houses <= 4:
@@ -193,6 +211,45 @@ def main():
                 all_returned = False
             
         return all_returned
+    
+    # Screenshot functionality
+    screenshot_counter = 0
+    
+    def take_screenshot():
+        nonlocal screenshot_counter
+        
+        if not ENABLE_SCREENSHOTS or SIMULATION_COMPLETE:
+            return
+            
+        # Create screenshots directory if it doesn't exist
+        if not os.path.exists("screenshots"):
+            os.makedirs("screenshots")
+            
+        screenshot_counter += 1
+        
+        # Get the figure canvas (Qt widget)
+        canvas = fig.canvas
+        
+        try:
+            # Option 1: Use Qt's grabFramebuffer for a clean screenshot
+            if hasattr(canvas, 'grab'):
+                # For Qt5
+                pixmap = canvas.grab()
+                pixmap.save(f"screenshots/screenshot_{screenshot_counter}.png")
+                print(f"Screenshot saved: screenshots/screenshot_{screenshot_counter}.png")
+            else:
+                # Option 2: Fallback to matplotlib's savefig
+                fig.savefig(f"screenshots/screenshot_{screenshot_counter}.png")
+                print(f"Screenshot saved using matplotlib: screenshots/screenshot_{screenshot_counter}.png")
+        except Exception as e:
+            print(f"Screenshot error: {e}")
+    
+    # Create a Qt timer for taking screenshots
+    screenshot_timer = None
+    if ENABLE_SCREENSHOTS:
+        screenshot_timer = QtCore.QTimer()
+        screenshot_timer.timeout.connect(take_screenshot)
+        screenshot_timer.start(SCREENSHOT_INTERVAL)  # milliseconds
     
     # Add this near the beginning of the update function to reduce update frequency:
     static_values = {
@@ -644,7 +701,14 @@ def main():
         
         # Display the combined figure with right plot margin for annotations
         plt.tight_layout()
+        
+        # Show the plot with Qt's main loop
         plt.show()
+        
+        # Stop the screenshot timer when animation ends
+        if screenshot_timer:
+            screenshot_timer.stop()
+        
     except Exception as e:
         # Print any error that occurs during animation
         print(f"Error during animation: {e}")
