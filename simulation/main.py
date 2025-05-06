@@ -25,6 +25,11 @@ def main():
         num_drone_bees = int(input("How many drone bees (black dots) do you want (1 to 4)? "))
         if not 1 <= num_drone_bees <= 4:
             raise ValueError
+            
+        max_timesteps = int(input("How many simulation timesteps do you want (100-1000)? "))
+        if not 100 <= max_timesteps <= 1000:
+            max_timesteps = 100  # Default to 100 if invalid input
+            print("Using default of 100 timesteps.")
     except ValueError:
         print("Invalid input. Please enter valid numbers as requested.")
         return
@@ -228,6 +233,17 @@ def main():
         
         # Update the queen-drone-baby simulation
         queen_drone_sim_complete = update_queen_drone_simulation()
+        
+        # Set max_timesteps from user input (only on first frame)
+        if frame == 0 and hasattr(update_queen_drone_simulation, 'max_timesteps'):
+            # Get the current value before we change it
+            original_value = update_queen_drone_simulation.max_timesteps
+            
+            # Set the custom max_timesteps value from user input
+            update_queen_drone_simulation.max_timesteps = max_timesteps
+            
+            # Print confirmation that we've changed the value
+            print(f"✅ Overriding default simulation timesteps: {original_value} → {max_timesteps}")
         
         # If the queen-drone simulation is complete, stop the entire animation
         if queen_drone_sim_complete:
@@ -610,7 +626,7 @@ def main():
         ani = animation.FuncAnimation(
             fig, 
             update, 
-            frames=999999,  # Increased from 1000 to practically infinite
+            frames=999999,  # Keep this at a large value - separate from max_timesteps
             interval=1000/FPS,  # Convert FPS to milliseconds between frames
             blit=True,  # Re-enable blitting but with proper artist management
             repeat=True  # Set to True to make sure it repeats if it ever reaches the end

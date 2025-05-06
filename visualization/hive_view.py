@@ -260,7 +260,8 @@ def update_queen_drone_simulation():
     # Add a static counter to reduce log frequency and track total timesteps
     if not hasattr(update_queen_drone_simulation, 'frame_counter'):
         update_queen_drone_simulation.frame_counter = 0
-        update_queen_drone_simulation.max_timesteps = 100  # Stop after 100 timesteps
+        # Default to 100, but this will be overridden by user input in main.py
+        update_queen_drone_simulation.max_timesteps = 100  # Initial value, can be changed
         print("👑🐝 QUEEN-DRONE DEBUG: First simulation update! Queen at", queen_bee.get_position())
         
         # Make sure they're visible with good contrast
