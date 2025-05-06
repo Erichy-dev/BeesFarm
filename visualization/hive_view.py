@@ -5,9 +5,15 @@ from comb.Classhive import CircleMarker, hexagon
 from comb import QueenBeeDot, DroneDot
 from utils.constants import HEX_SIZE, COLS, ROWS, OFFSET_X, OFFSET_Y
 
-def create_beehive_view(fig, gs, worker_bee_count):
+def create_beehive_view(fig, gs, worker_bee_count, drone_bees=4):
     """
     Create the beehive visualization.
+    
+    Parameters:
+    - fig: Figure to use
+    - gs: GridSpec to use
+    - worker_bee_count: Number of worker bees
+    - drone_bees: Number of drone bees for the queen-drone simulation (default: 4)
     """
     # Use our new visualization function from comb/Beehive.py
     ax, hexagon_grid, circle_markers, nectar_status, bee_status = create_beehive_visualization(
@@ -15,7 +21,7 @@ def create_beehive_view(fig, gs, worker_bee_count):
         subplot=gs[0, 0],
         worker_bees=worker_bee_count,
         max_nectar=20,  # Maximum nectar per cycle
-        drone_bees=4  # Number of drone bees
+        drone_bees=drone_bees  # Number of drone bees
     )
     
     # Position text in the extra space below the hexagons (data coordinates)
@@ -86,7 +92,14 @@ def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig
                          color='darkorange', fontweight='bold', fontsize=12,
                          horizontalalignment='center')
     
-    bee_status = ax.text(max_x/2 - 2, -3, f"Worker Bees: {worker_bees}", 
+    # Initialize status text with worker bee count
+    status_text = f"Worker Bees: {worker_bees}"
+    
+    # Add drone information if drones are included
+    if drone_bees > 0:
+        status_text += f" | 1 Queen & {drone_bees} Drones"
+    
+    bee_status = ax.text(max_x/2 - 2, -3, status_text, 
                        color='red', fontweight='bold', fontsize=12,
                        horizontalalignment='center')
     
@@ -319,8 +332,15 @@ def update_queen_drone_simulation():
             if should_log:
                 print("🔄 All drones now approaching queen again")
     
-    # Update bee status text
-    bee_status.set_text(f"Queen Bee (blue) and {len(drones)} Drones (black)")
+    # Get the current status text and maintain worker bee info
+    current_text = bee_status.get_text()
+    
+    # Check if the current text contains worker bee info
+    if "Worker Bees:" in current_text:
+        # Extract worker bee info
+        worker_info = current_text.split('|')[0].strip()
+        # Update bee status text with queen and drone info
+        bee_status.set_text(f"{worker_info} | Queen Bee & {len(drones)} Drones - {data['baby_bees_count']} Babies")
 
 def distance_between(p1, p2):
     """Calculate Euclidean distance between two points"""

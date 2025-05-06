@@ -20,6 +20,10 @@ def main():
         num_red_dots = int(input("How many worker bees (red dots) do you want (1 to 4)? "))
         if not 1 <= num_red_dots <= 4:
             raise ValueError
+            
+        num_drone_bees = int(input("How many drone bees (black dots) do you want (1 to 4)? "))
+        if not 1 <= num_drone_bees <= 4:
+            raise ValueError
     except ValueError:
         print("Invalid input. Please enter valid numbers as requested.")
         return
@@ -29,7 +33,7 @@ def main():
     gs = GridSpec(1, 2, width_ratios=[1, 1])
     
     # Create beehive visualization with the correct number of worker bees
-    beehive_ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status, timestamp_text, nectar_status, bee_sizes_text, total_nectar_text, total_box = create_beehive_view(fig, gs, num_red_dots)
+    beehive_ax, circle_markers, triangle_markers, square_markers, hexagon_grid, bee_status, timestamp_text, nectar_status, bee_sizes_text, total_nectar_text, total_box = create_beehive_view(fig, gs, num_red_dots, drone_bees=num_drone_bees)
     
     # Initialize the landscape grid and environment
     landscape = Landscape(block_size=15, max_gold_collected=20, num_houses=num_houses)
