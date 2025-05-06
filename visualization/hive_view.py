@@ -152,22 +152,37 @@ def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig
         if not hasattr(create_beehive_visualization, 'simulation_data'):
             create_beehive_visualization.simulation_data = {}
         
-        # Create queen bee marker (blue)
+        # Create queen bee marker (blue) - start near center of the hive
         queen_bee = QueenBeeDot()
+        
+        # Position queen in center of hive (around 7.5, 7.5 in QueenBeeDot coordinates)
+        queen_bee.position_x = 7.5 + random.uniform(-1.0, 1.0)  # Center with small variation
+        queen_bee.position_y = 7.5 + random.uniform(-1.0, 1.0)
+        
+        # Map to beehive coordinates
         qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
         
+        # If coordinates are outside the safe zone, force to center
+        if not (2 < qx < max_x - 2 and 2 < qy < max_y - 2):
+            qx, qy = max_x/2, max_y/2
+            
         # Make queen more visible - larger and blue
         queen_marker = CircleMarker(qx, qy, radius=0.25, color='blue')  # Bigger for visibility
         queen_marker.plot(ax)
         queen_marker.show()
         
-        print(f"👑 QUEEN: Created at position {queen_bee.get_position()} -> ({qx:.1f}, {qy:.1f})")
+        print(f"👑 QUEEN: Created at center position {queen_bee.get_position()} -> ({qx:.1f}, {qy:.1f})")
         
         # Create drone bee markers (black)
         drones = []
         drone_markers = []
         for i in range(drone_bees):
             drone = DroneDot()
+            
+            # Position drones around center too, but slightly more spread out than queen
+            drone.position_x = 7.5 + random.uniform(-2.0, 2.0)
+            drone.position_y = 7.5 + random.uniform(-2.0, 2.0)
+            
             drones.append(drone)
             
             dx, dy = map_to_beehive(drone.position_x, drone.position_y, max_x, max_y)
@@ -176,7 +191,7 @@ def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig
             drone_marker.show()
             drone_markers.append(drone_marker)
             
-            print(f"🐝 DRONE {i+1}: Created at position {drone.get_position()} -> ({dx:.1f}, {dy:.1f})")
+            print(f"🐝 DRONE {i+1}: Created at center area position {drone.get_position()} -> ({dx:.1f}, {dy:.1f})")
         
         # Store the simulation data in a static variable
         simulation_data = {
@@ -272,8 +287,29 @@ def update_queen_drone_simulation():
     # Log every 50 frames to avoid console flood
     should_log = update_queen_drone_simulation.frame_counter % 50 == 0
     
-    # Move queen bee
+    # Move queen bee - keep mostly in center region
     queen_bee.move_randomly(max_delta=0.2)
+    
+    # Gently nudge the queen back towards center if she wanders too far
+    center_x, center_y = 7.5, 7.5
+    dist_from_center = ((queen_bee.position_x - center_x)**2 + 
+                         (queen_bee.position_y - center_y)**2)**0.5
+    
+    # If queen is too far from center, apply gentle force back toward center
+    if dist_from_center > 3.0:  # Allow some movement, but not too far
+        # Calculate direction vector to center
+        dir_x = center_x - queen_bee.position_x
+        dir_y = center_y - queen_bee.position_y
+        # Normalize
+        mag = (dir_x**2 + dir_y**2)**0.5
+        if mag > 0:
+            dir_x /= mag
+            dir_y /= mag
+        # Apply gentle force toward center
+        queen_bee.position_x += dir_x * 0.1
+        queen_bee.position_y += dir_y * 0.1
+    
+    # Convert to beehive coordinates
     qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
     queen_marker.move(qx, qy)
     
@@ -301,9 +337,47 @@ def update_queen_drone_simulation():
         elif drone.state == "moving_away":
             moving_away += 1
             drone.move_away_from_queen(max_delta=0.7)
+            
+            # Keep drones within reasonable bounds from center
+            center_x, center_y = 7.5, 7.5
+            dist_from_center = ((drone.position_x - center_x)**2 + 
+                               (drone.position_y - center_y)**2)**0.5
+            if dist_from_center > 4.0:  # Further than queen but still contained
+                # Apply gentle force toward center
+                dir_x = center_x - drone.position_x
+                dir_y = center_y - drone.position_y
+                # Normalize
+                mag = (dir_x**2 + dir_y**2)**0.5
+                if mag > 0:
+                    dir_x /= mag
+                    dir_y /= mag
+                # Apply gentle centering force
+                drone.position_x += dir_x * 0.1
+                drone.position_y += dir_y * 0.1
+                
         elif drone.state == "waiting":
             waiting += 1
+            # Keep drones in the center area when waiting
+            center_x, center_y = 7.5, 7.5
+            
+            # Small random movement
             drone.move_randomly(max_delta=0.3)
+            
+            # Keep drones from wandering too far in waiting state
+            dist_from_center = ((drone.position_x - center_x)**2 + 
+                               (drone.position_y - center_y)**2)**0.5
+            if dist_from_center > 4.0:
+                # Move back toward center more strongly when waiting
+                dir_x = center_x - drone.position_x
+                dir_y = center_y - drone.position_y
+                # Normalize
+                mag = (dir_x**2 + dir_y**2)**0.5
+                if mag > 0:
+                    dir_x /= mag
+                    dir_y /= mag
+                # Apply stronger centering force
+                drone.position_x += dir_x * 0.15
+                drone.position_y += dir_y * 0.15
         elif drone.state == "ready_for_gold":
             ready += 1
         
@@ -323,14 +397,21 @@ def update_queen_drone_simulation():
     if all(drone.state == "ready_for_gold" for drone in drones):
         # Create a baby bee (gold dot)
         data['baby_bees_count'] += 1
-        queen_x, queen_y = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
         
-        # Create a gold dot marker for the baby bee
-        gold_dot = plt.Circle((queen_x, queen_y), 0.15, color='gold', zorder=80)
+        # Ensure baby bee appears in the visible center area
+        # Instead of using the queen's exact position, create babies in the same general area
+        baby_x = max_x/2 + random.uniform(-1.5, 1.5)  # Center area of the hive
+        baby_y = max_y/2 + random.uniform(-1.5, 1.5)
+        
+        # Vary the size of baby bees slightly for visual interest
+        baby_size = 0.15 + random.uniform(-0.03, 0.03)
+        
+        # Create a gold dot marker for the baby bee with varied size
+        gold_dot = plt.Circle((baby_x, baby_y), baby_size, color='gold', zorder=80)
         ax.add_artist(gold_dot)
         data['gold_dots'].append(gold_dot)
         
-        print(f"🎉 BABY BEE BORN! Total babies: {data['baby_bees_count']}")
+        print(f"🎉 BABY BEE BORN! Total babies: {data['baby_bees_count']} at ({baby_x:.1f}, {baby_y:.1f})")
         
         # Update status
         nectar_status.set_text(f"Mating simulation - Baby Bees: {data['baby_bees_count']}")
