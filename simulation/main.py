@@ -12,10 +12,6 @@ from movement.movement import Move
 from utils.helpers import ensure_gold_dots_at_spawn_points, regenerate_nectar, reset_bee_positions
 from utils.constants import FPS, WAIT_BETWEEN_CYCLES, DEBUG_VERBOSE, COLS, ROWS, OFFSET_X, OFFSET_Y
 
-# Screenshot configuration
-ENABLE_SCREENSHOTS = True  # Set to False to disable screenshots
-SCREENSHOT_INTERVAL = 1.0  # Time between screenshots in seconds
-
 # Global variable to track if simulation is complete
 SIMULATION_COMPLETE = False
 
@@ -201,9 +197,7 @@ def main():
     # Add this near the beginning of the update function to reduce update frequency:
     static_values = {
         'last_debug_frame': 0,
-        'last_nectar_debug': 0,
-        'last_screenshot_time': 0,  # Track when we took the last screenshot
-        'screenshot_counter': 0,    # Counter for naming screenshots
+        'last_nectar_debug': 0
     }
     
     # Define animation update function that updates both displays
@@ -230,20 +224,6 @@ def main():
         if frame - static_values['last_debug_frame'] >= 50:  # Only show debug every 50 frames
             show_debug = True
             static_values['last_debug_frame'] = frame
-        
-        # Take a screenshot every second
-        current_time = time.time()
-        if current_time - static_values['last_screenshot_time'] >= 1.0:  # Every 1 second
-            static_values['screenshot_counter'] += 1
-            from visualization.hive_view import save_image
-            
-            # Create a screenshots directory if it doesn't exist
-            if not os.path.exists("screenshots"):
-                os.makedirs("screenshots")
-                
-            # Save to the screenshots directory
-            save_image(fig, f"screenshots/screenshot_{static_values['screenshot_counter']}.png")
-            static_values['last_screenshot_time'] = current_time
         
         # Update the queen-drone-baby simulation
         queen_drone_sim_complete = update_queen_drone_simulation()
