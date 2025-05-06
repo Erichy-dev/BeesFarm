@@ -2,3 +2,4 @@
 DS_Store
 pycache
 timestep_images
+*.png*
