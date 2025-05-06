@@ -562,4 +562,10 @@ def update_nectar_level(hexagon_grid, current_nectar, max_nectar_per_cycle, tota
             cell_b = 0.9 - (0.9 * cell_darkness)   # Blue decreases completely
             
             # Set color for this hexagon
-            hex_patch.set_facecolor((r, cell_g, cell_b, alpha)) 
+            hex_patch.set_facecolor((r, cell_g, cell_b, alpha))
+
+def save_image(fig, filename):
+    """Save the current figure as an image"""
+    # Use transparent=True to ensure we don't affect the background
+    fig.savefig(filename, transparent=False)
+    print(f"Image saved to {filename}") 

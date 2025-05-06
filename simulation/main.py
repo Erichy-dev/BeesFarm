@@ -4,6 +4,7 @@ import time
 import random
 import numpy as np
 from matplotlib.gridspec import GridSpec
+import os
 
 from visualization.hive_view import create_beehive_view, update_nectar_level, update_queen_drone_simulation
 from entities.landscape import Landscape
@@ -189,6 +190,8 @@ def main():
     static_values = {
         'last_debug_frame': 0,
         'last_nectar_debug': 0,
+        'last_screenshot_time': 0,  # Track when we took the last screenshot
+        'screenshot_counter': 0,    # Counter for naming screenshots
     }
     
     # Define animation update function that updates both displays
@@ -208,6 +211,20 @@ def main():
         # Get real elapsed time for accurate timing
         elapsed_time = time.time() - start_time
         formatted_time = f"{elapsed_time:.1f}"
+        
+        # Take a screenshot every second
+        current_time = time.time()
+        if current_time - static_values['last_screenshot_time'] >= 1.0:  # Every 1 second
+            static_values['screenshot_counter'] += 1
+            from visualization.hive_view import save_image
+            
+            # Create a screenshots directory if it doesn't exist
+            if not os.path.exists("screenshots"):
+                os.makedirs("screenshots")
+                
+            # Save to the screenshots directory
+            save_image(fig, f"screenshots/screenshot_{static_values['screenshot_counter']}.png")
+            static_values['last_screenshot_time'] = current_time
         
         # Update the queen-drone-baby simulation
         queen_drone_sim_complete = update_queen_drone_simulation()
