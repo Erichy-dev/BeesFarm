@@ -29,12 +29,13 @@ def create_beehive_view(fig, gs, worker_bee_count, drone_bees=4):
     max_x = COLS * OFFSET_X
     max_y = ROWS * OFFSET_Y + OFFSET_Y/2
     
-    bee_sizes_text = ax.text(max_x/2 - 2, -1.5, "Bee Growth: Normal", 
+    # Better vertical spacing between text elements
+    bee_sizes_text = ax.text(max_x/2, -1.5, "Bee Growth: Normal", 
                           color='purple', fontweight='bold', fontsize=12,
                           horizontalalignment='center')
     
-    timestamp_text = ax.text(max_x/2 - 2, -5, "Time: 0.0 seconds", fontsize=12,
-                          horizontalalignment='center')
+    timestamp_text = ax.text(max_x/2, -5, "Time: 0.0 seconds", fontsize=12,
+                          horizontalalignment='center', bbox=dict(facecolor='white', alpha=0.7, pad=2))
     
     # Create a box for the total counter
     total_box = plt.Rectangle((0, -9), max_x, 1.3, facecolor='honeydew', 
@@ -91,21 +92,23 @@ def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig
     # Add title for the visualization
     title = ax.set_title("Beehive Visualization", fontsize=14, pad=15)
     
-    # Position text in the original positions
-    nectar_status = ax.text(max_x/2 - 2, -7, "Nectar in Hive: 0", 
+    # Position text in the original positions - more vertical space between them
+    nectar_status = ax.text(max_x/2, -6.5, "Nectar in Hive: 0", 
                          color='darkorange', fontweight='bold', fontsize=12,
-                         horizontalalignment='center')
+                         horizontalalignment='center', bbox=dict(facecolor='white', alpha=0.7, pad=2))
     
     # Initialize status text with worker bee count
     status_text = f"Worker Bees: {worker_bees}"
     
     # Add drone information if drones are included
     if drone_bees > 0:
-        status_text += f" | 1 Queen & {drone_bees} Drones"
+        status_text = f"Worker Bees: {worker_bees} | Queen & {drone_bees} Drones (0 Babies)"
     
-    bee_status = ax.text(max_x/2 - 2, -3, status_text, 
-                       color='red', fontweight='bold', fontsize=12,
-                       horizontalalignment='center')
+    # Create the bee status text with bold formatting and slightly larger font
+    # Moved up to prevent overlap with other text
+    bee_status = ax.text(max_x/2, -3.5, status_text, 
+                       color='red', fontweight='bold', fontsize=13,
+                       horizontalalignment='center', bbox=dict(facecolor='white', alpha=0.7, pad=3))
     
     # Draw hexagons to form the honeycomb - starting with very light color
     # to show absence of nectar
@@ -350,16 +353,44 @@ def update_queen_drone_simulation():
     # Get the current status text and maintain worker bee info
     current_text = bee_status.get_text()
     
-    # Check if the current text contains worker bee info
+    # Count the current state of drones for detailed status
+    drone_states = {
+        "approaching": approaching,
+        "ready": ready,
+        "moving_away": moving_away,
+        "waiting": waiting
+    }
+    
+    # Create clean simple status text - minimize complexity to prevent scribbling
     if "Worker Bees:" in current_text:
-        # Extract worker bee info
         worker_info = current_text.split('|')[0].strip()
-        # Update bee status text with queen and drone info
-        bee_status.set_text(f"{worker_info} | Queen Bee & {len(drones)} Drones - {data['baby_bees_count']} Babies")
-        
+        status = f"{worker_info} | Queen, {len(drones)} Drones"
+    else:
+        status = f"Queen, {len(drones)} Drones"
+    
+    # Add simple activity label
+    if approaching > 0:
+        status += " (approaching)"
+    elif ready > 0:
+        status += " (mating)"
+    elif moving_away > 0:
+        status += " (departing)"
+    
+    # Add baby count if any
+    if data['baby_bees_count'] > 0:
+        status += f" - {data['baby_bees_count']} Babies"
+    
+    # Replace text completely
+    bee_status.set_text(status)
+    
+    # Consistent styling
+    bee_status.set_color('red')
+    bee_status.set_fontweight('bold')
+    
     # Update timestamp text to show simulation progress
     if 'timestamp_text' in data:
-        data['timestamp_text'].set_text(f"Simulation: {update_queen_drone_simulation.frame_counter}/{update_queen_drone_simulation.max_timesteps} steps")
+        # Show both the frame counter and baby bee count in the timestamp
+        data['timestamp_text'].set_text(f"Queen-Drone Sim: {update_queen_drone_simulation.frame_counter}/{update_queen_drone_simulation.max_timesteps} steps | {data['baby_bees_count']} Baby Bees")
     
     # Simulation is still running
     return False

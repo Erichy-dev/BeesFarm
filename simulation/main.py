@@ -91,6 +91,7 @@ def main():
     all_artists.append(timestamp_text)
     all_artists.append(nectar_status)
     all_artists.append(bee_sizes_text)
+    all_artists.append(bee_status)
     all_artists.append(total_nectar_text)
     all_artists.append(total_box)  # Add the background box for total nectar
     
