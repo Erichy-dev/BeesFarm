@@ -17,12 +17,12 @@ COLS, ROWS = 10, 5
 OFFSET_X = 1.5 * HEX_SIZE
 OFFSET_Y = np.sqrt(3) * HEX_SIZE
 MAX_X = COLS * OFFSET_X
-MAX_Y = ROWS * OFFSET_Y + OFFSET_Y/2
+MAX_Y = ROWS * OFFSET_Y + OFFSET_Y/1.5
 
 def map_to_beehive(x, y):
     """Map coordinates from the 0-15 range to beehive coordinates"""
     mapped_x = (x / 15) * MAX_X
-    mapped_y = (y / 15) * MAX_Y
+    mapped_y = (y / 20) * MAX_Y
     return mapped_x, mapped_y
 
 def main():
@@ -86,6 +86,11 @@ def main():
     # Simulation loop
     total_steps = 60
     for step in range(total_steps):
+        # Check if window has been closed
+        if not plt.fignum_exists(fig.number):
+            print("Window closed by user. Exiting simulation.")
+            break
+            
         # Move queen bee
         queen_bee.move_randomly(max_delta=0.2)
         qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y)
@@ -141,12 +146,19 @@ def main():
         for i, drone in enumerate(drones):
             print(f"Drone {i + 1}: {drone}")
         
-        # Save the figure
-        plt.savefig(f"{save_dir}/beehive_step_{step+1}.png")
-        plt.pause(0.5)
+        # Save the figure (only if the window is still open)
+        if plt.fignum_exists(fig.number):
+            plt.savefig(f"{save_dir}/beehive_step_{step+1}.png")
+            plt.pause(0.5)
     
-    plt.ioff()
-    plt.show()
+    # Only show if the window is still open at the end
+    if plt.fignum_exists(fig.number):
+        # Fix for the double popup issue - use only one of these approaches
+        # Option 1: Keep interactive mode on and just wait for a click
+        plt.show(block=True)
+    
+    # Option 2 (alternative): Just leave interactive mode on and pause
+    # plt.pause(0)  # This would pause indefinitely until window is closed
 
 def distance_between(p1, p2):
     return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
