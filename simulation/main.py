@@ -12,6 +12,13 @@ from movement.movement import Move
 from utils.helpers import ensure_gold_dots_at_spawn_points, regenerate_nectar, reset_bee_positions
 from utils.constants import FPS, WAIT_BETWEEN_CYCLES, DEBUG_VERBOSE, COLS, ROWS, OFFSET_X, OFFSET_Y
 
+# Screenshot configuration
+ENABLE_SCREENSHOTS = True  # Set to False to disable screenshots
+SCREENSHOT_INTERVAL = 1.0  # Time between screenshots in seconds
+
+# Global variable to track if simulation is complete
+SIMULATION_COMPLETE = False
+
 def main():
     try:
         num_houses = int(input("How many houses do you want (1 to 4)? "))
@@ -26,10 +33,10 @@ def main():
         if not 1 <= num_drone_bees <= 4:
             raise ValueError
             
-        max_timesteps = int(input("How many simulation timesteps do you want (100-1000)? "))
-        if not 100 <= max_timesteps <= 1000:
-            max_timesteps = 100  # Default to 100 if invalid input
-            print("Using default of 100 timesteps.")
+        max_timesteps = int(input("How many simulation timesteps do you want (10-1000)? "))
+        if not 10 <= max_timesteps <= 1000:
+            max_timesteps = 10  # Default to 10 if invalid input
+            print("Using default of 10 timesteps.")
     except ValueError:
         print("Invalid input. Please enter valid numbers as requested.")
         return
@@ -201,21 +208,28 @@ def main():
     
     # Define animation update function that updates both displays
     def update(frame):
+        global SIMULATION_COMPLETE
+        
         nonlocal last_nectar_count, is_nectar_exhausted, nectar_cycle_count
         nonlocal waiting_for_next_cycle, cycle_complete_time, total_nectar_collected
         nonlocal landscape
         nonlocal bee_comb_positions, bee_entrance_animations, bees_in_hive_prev, bees_in_hive_current
         nonlocal all_artists, ani
         
+        # Get real elapsed time for accurate timing
+        elapsed_time = time.time() - start_time
+        formatted_time = f"{elapsed_time:.1f}"
+        
+        # If simulation is complete, don't update anything - stop everything
+        if SIMULATION_COMPLETE:
+            # Just return all_artists to keep the display but stop updates
+            return all_artists
+        
         # Track timing to reduce debug frequency
         show_debug = False
         if frame - static_values['last_debug_frame'] >= 50:  # Only show debug every 50 frames
             show_debug = True
             static_values['last_debug_frame'] = frame
-            
-        # Get real elapsed time for accurate timing
-        elapsed_time = time.time() - start_time
-        formatted_time = f"{elapsed_time:.1f}"
         
         # Take a screenshot every second
         current_time = time.time()
@@ -247,10 +261,26 @@ def main():
         
         # If the queen-drone simulation is complete, stop the entire animation
         if queen_drone_sim_complete:
-            print("\n🏁 SIMULATION COMPLETE: Queen-drone simulation reached 100 timesteps.")
+            print(f"\n🏁 SIMULATION COMPLETE: Queen-drone simulation reached {max_timesteps} timesteps.")
             print(f"Total nectar collected: {total_nectar_collected + landscape.movement.gold_collected}")
             print(f"Total simulation time: {formatted_time} seconds")
-            ani.event_source.stop()
+            
+            # Set global simulation_complete flag
+            SIMULATION_COMPLETE = True
+            
+            # Force all movement to stop
+            if hasattr(landscape, 'movement'):
+                landscape.movement.completed = True
+                # Make all bees stop moving
+                for dot in landscape.objects.red_dots:
+                    if hasattr(dot, 'velocity'):
+                        dot.velocity = (0, 0)
+                    if hasattr(dot, 'target'):
+                        dot.target = None
+            
+            # Update the timestamp to show completion
+            timestamp_text.set_text(f"Time: {formatted_time} seconds - SIMULATION COMPLETE")
+            
             return all_artists
         
         # Add queen, drone, and baby bee markers to all_artists for animation

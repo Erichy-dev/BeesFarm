@@ -109,8 +109,9 @@ class Landscape:
 
         def update(frame):
             if self.movement and self.movement.completed:
-                ani.event_source.stop()
-                return
+                # Don't call stop() - it can cause animation errors
+                # Just return the artists without updating
+                return *red_circles, *gold_circles, gold_text
 
             if self.movement:
                 self.movement.update_state()
