@@ -5,7 +5,7 @@ import random
 import numpy as np
 from matplotlib.gridspec import GridSpec
 
-from visualization.hive_view import create_beehive_view, update_nectar_level
+from visualization.hive_view import create_beehive_view, update_nectar_level, update_queen_drone_simulation
 from entities.landscape import Landscape
 from movement.movement import Move
 from utils.helpers import ensure_gold_dots_at_spawn_points, regenerate_nectar, reset_bee_positions
@@ -189,6 +189,7 @@ def main():
         nonlocal waiting_for_next_cycle, cycle_complete_time, total_nectar_collected
         nonlocal landscape
         nonlocal bee_comb_positions, bee_entrance_animations, bees_in_hive_prev, bees_in_hive_current
+        nonlocal all_artists
         
         # Track timing to reduce debug frequency
         show_debug = False
@@ -199,6 +200,30 @@ def main():
         # Get real elapsed time for accurate timing
         elapsed_time = time.time() - start_time
         formatted_time = f"{elapsed_time:.1f}"
+        
+        # Update the queen-drone-baby simulation
+        update_queen_drone_simulation()
+        
+        # Add queen, drone, and baby bee markers to all_artists for animation
+        # Import the visualization simulation data to access the markers
+        if hasattr(update_queen_drone_simulation, 'frame_counter'):
+            from visualization.hive_view import create_beehive_visualization
+            if hasattr(create_beehive_visualization, 'simulation_data'):
+                data = create_beehive_visualization.simulation_data
+                
+                # Add queen marker
+                if hasattr(data['queen_marker'], 'circle') and data['queen_marker'].circle not in all_artists:
+                    all_artists.append(data['queen_marker'].circle)
+                
+                # Add drone markers
+                for drone_marker in data['drone_markers']:
+                    if hasattr(drone_marker, 'circle') and drone_marker.circle not in all_artists:
+                        all_artists.append(drone_marker.circle)
+                
+                # Add gold dots (baby bees)
+                for gold_dot in data['gold_dots']:
+                    if gold_dot not in all_artists:
+                        all_artists.append(gold_dot)
         
         # If we're in the waiting period between cycles
         if waiting_for_next_cycle:

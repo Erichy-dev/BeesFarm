@@ -126,6 +126,8 @@ def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig
 
     # queen-baby-drone simulation
     if drone_bees > 0:
+        print("👑🐝 QUEEN-DRONE DEBUG: Initializing queen-drone simulation with", drone_bees, "drones")
+        
         # Store these for later updates in the simulation
         if not hasattr(create_beehive_visualization, 'simulation_data'):
             create_beehive_visualization.simulation_data = {}
@@ -133,22 +135,28 @@ def create_beehive_visualization(worker_bees=3, drone_bees=3, max_nectar=20, fig
         # Create queen bee marker (blue)
         queen_bee = QueenBeeDot()
         qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
-        queen_marker = CircleMarker(qx, qy, radius=0.15, color='blue')
+        
+        # Make queen more visible - larger and blue
+        queen_marker = CircleMarker(qx, qy, radius=0.25, color='blue')  # Bigger for visibility
         queen_marker.plot(ax)
         queen_marker.show()
+        
+        print(f"👑 QUEEN: Created at position {queen_bee.get_position()} -> ({qx:.1f}, {qy:.1f})")
         
         # Create drone bee markers (black)
         drones = []
         drone_markers = []
-        for _ in range(drone_bees):
+        for i in range(drone_bees):
             drone = DroneDot()
             drones.append(drone)
             
             dx, dy = map_to_beehive(drone.position_x, drone.position_y, max_x, max_y)
-            drone_marker = CircleMarker(dx, dy, radius=0.1, color='black')
+            drone_marker = CircleMarker(dx, dy, radius=0.15, color='black')  # Slightly bigger for visibility
             drone_marker.plot(ax)
             drone_marker.show()
             drone_markers.append(drone_marker)
+            
+            print(f"🐝 DRONE {i+1}: Created at position {drone.get_position()} -> ({dx:.1f}, {dy:.1f})")
         
         # Store the simulation data in a static variable
         simulation_data = {
@@ -196,6 +204,7 @@ def update_queen_drone_simulation():
     """
     # Check if simulation data exists
     if not hasattr(create_beehive_visualization, 'simulation_data'):
+        print("👑🐝 QUEEN-DRONE DEBUG: No simulation data found! Queen-drone simulation not initialized.")
         return
     
     data = create_beehive_visualization.simulation_data
@@ -209,26 +218,75 @@ def update_queen_drone_simulation():
     max_x = data['max_x']
     max_y = data['max_y']
     
+    # Add a static counter to reduce log frequency
+    if not hasattr(update_queen_drone_simulation, 'frame_counter'):
+        update_queen_drone_simulation.frame_counter = 0
+        print("👑🐝 QUEEN-DRONE DEBUG: First simulation update! Queen at", queen_bee.get_position())
+        
+        # Make sure they're visible with good contrast
+        queen_marker.radius = 0.25  # Make queen larger for visibility
+        if hasattr(queen_marker, 'circle'):
+            queen_marker.circle.set_radius(0.25)
+            queen_marker.circle.set_color('blue')
+            queen_marker.circle.set_zorder(100)  # Ensure queen is on top
+        
+        for marker in drone_markers:
+            marker.radius = 0.15  # Make drones visible too
+            if hasattr(marker, 'circle'):
+                marker.circle.set_radius(0.15)
+                marker.circle.set_color('black')
+                marker.circle.set_zorder(90)  # Drones below queen but above other markers
+    
+    update_queen_drone_simulation.frame_counter += 1
+    
+    # Log every 50 frames to avoid console flood
+    should_log = update_queen_drone_simulation.frame_counter % 50 == 0
+    
     # Move queen bee
     queen_bee.move_randomly(max_delta=0.2)
     qx, qy = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
     queen_marker.move(qx, qy)
+    
+    if should_log:
+        print(f"👑 QUEEN: Moving to ({qx:.1f}, {qy:.1f}) - Original pos: {queen_bee.get_position()}")
+    
+    # Count drones in different states
+    approaching = 0
+    ready = 0
+    moving_away = 0
+    waiting = 0
     
     # Move drones
     for i, drone in enumerate(drones):
         marker = drone_markers[i]
         
         if drone.state == "approaching":
+            approaching += 1
             drone.approach_queen(queen_bee.get_position(), max_delta=0.6)
             if distance_between(drone.get_position(), queen_bee.get_position()) <= data['interaction_radius']:
                 drone.state = "ready_for_gold"
+                if should_log:
+                    print(f"🐝 DRONE {i+1}: Reached queen! Now ready for mating.")
         elif drone.state == "moving_away":
+            moving_away += 1
             drone.move_away_from_queen(max_delta=0.7)
         elif drone.state == "waiting":
+            waiting += 1
             drone.move_randomly(max_delta=0.3)
+        elif drone.state == "ready_for_gold":
+            ready += 1
         
         dx, dy = map_to_beehive(drone.position_x, drone.position_y, max_x, max_y)
         marker.move(dx, dy)
+        
+        # Make sure markers are visible 
+        marker.show()
+    
+    # Always ensure queen is visible
+    queen_marker.show()
+    
+    if should_log:
+        print(f"🐝 DRONES: {len(drones)} total - Approaching: {approaching}, Ready: {ready}, Moving away: {moving_away}, Waiting: {waiting}")
     
     # Check if all drones are ready for gold (mating)
     if all(drone.state == "ready_for_gold" for drone in drones):
@@ -237,9 +295,11 @@ def update_queen_drone_simulation():
         queen_x, queen_y = map_to_beehive(queen_bee.position_x, queen_bee.position_y, max_x, max_y)
         
         # Create a gold dot marker for the baby bee
-        gold_dot = plt.Circle((queen_x, queen_y), 0.15, color='gold')
+        gold_dot = plt.Circle((queen_x, queen_y), 0.15, color='gold', zorder=80)
         ax.add_artist(gold_dot)
         data['gold_dots'].append(gold_dot)
+        
+        print(f"🎉 BABY BEE BORN! Total babies: {data['baby_bees_count']}")
         
         # Update status
         nectar_status.set_text(f"Mating simulation - Baby Bees: {data['baby_bees_count']}")
@@ -256,6 +316,8 @@ def update_queen_drone_simulation():
             for drone in drones:
                 drone.state = "approaching"
             data['random_move_timer'] = 0
+            if should_log:
+                print("🔄 All drones now approaching queen again")
     
     # Update bee status text
     bee_status.set_text(f"Queen Bee (blue) and {len(drones)} Drones (black)")
