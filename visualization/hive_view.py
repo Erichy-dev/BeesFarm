@@ -483,7 +483,7 @@ def distance_between(p1, p2):
 def update_nectar_level(hexagon_grid, current_nectar, max_nectar_per_cycle, total_nectar, cycle_count, nectar_status):
     """
     Update the hexagon colors based on the TOTAL amount of nectar collected across all cycles.
-    The color darkens progressively over time, without resetting between cycles.
+    The color darkens progressively using an exponential function for faster darkening.
     
     Parameters:
     - hexagon_grid: The grid of hexagon patches
@@ -496,16 +496,15 @@ def update_nectar_level(hexagon_grid, current_nectar, max_nectar_per_cycle, tota
     # Update the nectar status text to show current cycle info
     nectar_status.set_text(f"Nectar in Hive: {current_nectar}/{max_nectar_per_cycle} (Cycle {cycle_count})")
     
-    # We no longer use a ratio based on current cycle, but on overall accumulation
-    # Estimate how dark the hive should be based on total nectar
-    # The hive can get very dark after several complete cycles
-    
     # For color calculation, reduce max_expected_nectar to see changes sooner
-    # With 20 nectar per cycle, we'll see max darkness after 2 cycles
-    max_expected_nectar = 40  # After this much nectar, the comb is at maximum darkness
+    # With 20 nectar per cycle, we'll see significant darkening after just 1 cycle
+    max_expected_nectar = 30  # Lower threshold for faster visual feedback
     
-    # Calculate the darkness level (0 to 1)
-    darkness_level = min(1.0, total_nectar / max_expected_nectar)
+    # Calculate the darkness level (0 to 1) using an exponential function
+    # This will make the darkness increase more dramatically at first
+    linear_ratio = min(1.0, total_nectar / max_expected_nectar)
+    exponent = 2.5  # Increased from 2.0 for even faster darkening
+    darkness_level = 1.0 - (1.0 - linear_ratio) ** exponent
     
     # Only print debug info very occasionally to reduce noise
     # Use a static variable to track when we last printed
@@ -514,39 +513,53 @@ def update_nectar_level(hexagon_grid, current_nectar, max_nectar_per_cycle, tota
     
     # Only log when nectar amount has changed AND it's a significant change
     if total_nectar != update_nectar_level._last_printed_nectar and (
-        total_nectar % 10 == 0 or  # Print on multiples of 10
-        total_nectar - update_nectar_level._last_printed_nectar >= 10  # Or every 10 increase
+        total_nectar % 5 == 0 or  # Print on multiples of 5
+        total_nectar - update_nectar_level._last_printed_nectar >= 5  # Or every 5 increase
     ):
-        print(f"[NECTAR] Total: {total_nectar}, Darkness: {darkness_level:.2f}")
+        print(f"[NECTAR] Total: {total_nectar}, Darkness: {darkness_level:.2f}, Exponential function applied")
         update_nectar_level._last_printed_nectar = total_nectar
     
-    # Calculate color based on nectar level - MORE dramatic shift from light to dark gold
+    # Calculate color based on nectar level - MUCH more dramatic shift from light to dark gold
     # Start with a very light color (r=1.0, g=0.98, b=0.9)
-    # End with deep amber gold (r=1.0, g=0.75, b=0.0)
-    r = 1.0  # Red stays at max
-    g = 0.98 - (0.23 * darkness_level)  # Green decreases more dramatically
+    # End with rich golden amber (r=1.0, g=0.55, b=0.0)
+    r = 1.0  # Red stays at max for golden appearance
+    g = 0.98 - (0.43 * darkness_level)  # Green decreases more dramatically for richer gold
     b = 0.9 - (0.9 * darkness_level)    # Blue decreases to zero completely
     
     # Add some alpha to make it look richer when filled
-    alpha = 0.7 + (0.3 * darkness_level)
+    alpha = 0.75 + (0.25 * darkness_level)  # Slightly higher base alpha for richer appearance
     
-    # Fill all hexagons in the grid with the same color
-    # For a more sophisticated look, we could darken from bottom to top
+    # Center coordinates for radial gradient
+    center_col = COLS / 2
+    center_row = ROWS / 2
     
-    # Calculate how many rows should be filled based on the darkness
-    # All rows get some color, but darker at the bottom
+    # Maximum distance from center for normalization
+    max_distance = ((COLS/2)**2 + (ROWS/2)**2)**0.5
+    
+    # Apply different darkness levels based on row position and distance from center
     for row_idx in range(ROWS):
         row = hexagon_grid[row_idx]
         
-        # Add gradient effect - bottom rows much darker than top rows
-        # Apply 100% of darkness at the bottom row, decreasing as we move up
-        row_factor = 1.0 - (row_idx / ROWS * 0.7)  # 1.0 to 0.3 from bottom to top (steeper gradient)
-        row_darkness = darkness_level * row_factor
+        # Apply gradient effect - bottom rows and center cells darker
+        # Apply exponential gradient from bottom to top
+        row_factor = 1.0 - (row_idx / ROWS) ** 1.5  # Steeper gradient (1.0 to ~0.2)
         
-        # Row-specific color - more dramatic contrast
-        row_g = 0.98 - (0.3 * row_darkness)  # Greater green decrease
-        row_b = 0.9 - (0.9 * row_darkness)   # Eliminate blue completely
-        
-        # Set color for all hexagons in this row
-        for hex_patch in row:
-            hex_patch.set_facecolor((r, row_g, row_b, alpha)) 
+        for col_idx, hex_patch in enumerate(row):
+            # Calculate distance from center
+            dist_from_center = ((col_idx - center_col)**2 + (row_idx - center_row)**2)**0.5
+            # Normalize to 0-1 range and invert (center = 1, edges = 0)
+            center_factor = 1.0 - (dist_from_center / max_distance) ** 1.2  # Exponential falloff from center
+            
+            # Combine row gradient and center gradient
+            # Weight the center gradient more (60% center, 40% row gradient)
+            combined_factor = 0.4 * row_factor + 0.6 * center_factor
+            
+            # Apply the combined factor to the darkness
+            cell_darkness = darkness_level * combined_factor
+            
+            # Cell-specific color with dramatic contrast
+            cell_g = 0.98 - (0.43 * cell_darkness)  # Green decreases
+            cell_b = 0.9 - (0.9 * cell_darkness)   # Blue decreases completely
+            
+            # Set color for this hexagon
+            hex_patch.set_facecolor((r, cell_g, cell_b, alpha)) 
