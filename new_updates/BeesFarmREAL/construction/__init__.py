@@ -1,2 +1,3 @@
 # Construction phase package
-from construction.construction_phase import initialize_comb_construction, update_comb_construction 
+from construction.construction_phase import initialize_comb_construction, update_comb_construction
+from construction.construction_animation import run_construction_animation 
