@@ -7,7 +7,8 @@ from utils.helpers import regenerate_nectar
 class AnimationHandler:
     def __init__(self, landscape, circle_markers, triangle_markers, square_markers, 
                  hexagon_grid, bee_status, timestamp_text, nectar_status, 
-                 bee_sizes_text, total_nectar_text, total_box, screenshot_manager=None):
+                 bee_sizes_text, total_nectar_text, total_box, screenshot_manager=None,
+                 target_timesteps=None):
         
         self.landscape = landscape
         self.circle_markers = circle_markers
@@ -21,6 +22,9 @@ class AnimationHandler:
         self.total_nectar_text = total_nectar_text
         self.total_box = total_box
         self.screenshot_manager = screenshot_manager
+        
+        # Store the original target timesteps for reporting
+        self.target_timesteps = target_timesteps or landscape.max_timesteps
         
         # Start time tracking
         self.start_time = time.time()
@@ -117,7 +121,7 @@ class AnimationHandler:
         
         # If the queen-drone simulation is complete, stop the entire animation
         if queen_drone_sim_complete:
-            print(f"\n🏁 SIMULATION COMPLETE: Queen-drone simulation reached {self.landscape.max_timesteps} timesteps.")
+            print(f"\n🏁 QUEEN-DRONE SIMULATION COMPLETE: Reached {self.target_timesteps} timesteps")
             print(f"Total nectar collected: {self.total_nectar_collected + self.landscape.movement.gold_collected}")
             print(f"Total simulation time: {formatted_time} seconds")
             

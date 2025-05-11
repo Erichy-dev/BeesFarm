@@ -89,6 +89,18 @@ def main():
         print("Invalid input. Use -i for interactive mode or -f and -p for batch mode.")
         return
 
+    # Store original target timesteps before adding compensation
+    original_timesteps = max_timesteps
+    
+    # Add 15 timesteps to compensate for construction phase
+    if not args.skip_construction:
+        compensation_timesteps = 20
+        max_timesteps += compensation_timesteps
+        print(f"Adding {compensation_timesteps} timesteps to compensate for construction phase ({original_timesteps} → {max_timesteps})")
+
+    # Set target timesteps in the update function (for displaying the correct target)
+    update_queen_drone_simulation.target_timesteps = original_timesteps
+
     # Create figure with grid layout for both visualizations
     fig = plt.figure(figsize=(16, 8))
     gs = GridSpec(1, 2, width_ratios=[1, 1])
@@ -120,7 +132,13 @@ def main():
     
     # NOW setup objects in the environment (after construction)
     landscape = Landscape(block_size=15, max_gold_collected=20, num_houses=num_houses)
-    landscape.max_timesteps = max_timesteps  # Store the max timesteps for use in animation
+    
+    # Set max timesteps with compensation for construction time
+    landscape.max_timesteps = max_timesteps
+    # Store original timesteps for reporting
+    landscape.original_timesteps = original_timesteps
+    print(f"Simulation will run for {max_timesteps} timesteps (target: {original_timesteps})")
+    
     landscape.objects.add_beehive(position=(11, 0), height=3, width=3)
     landscape.objects.add_pond(position=(12, 5), height=5, width=3)
     landscape.objects.add_red_dots(count=num_red_dots)
@@ -164,7 +182,8 @@ def main():
         bee_sizes_text=bee_sizes_text,
         total_nectar_text=total_nectar_text,
         total_box=total_box,
-        screenshot_manager=screenshot_manager
+        screenshot_manager=screenshot_manager,
+        target_timesteps=original_timesteps  # Pass original target timesteps
     )
     
     try:
