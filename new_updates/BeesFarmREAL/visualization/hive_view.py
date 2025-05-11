@@ -4,6 +4,16 @@ import numpy as np
 from comb.Classhive import CircleMarker, hexagon
 from comb import QueenBeeDot, DroneDot
 from utils.constants import HEX_SIZE, COLS, ROWS, OFFSET_X, OFFSET_Y
+from construction.construction_phase import initialize_comb_construction, update_comb_construction
+
+# Re-export construction phase functions
+__all__ = [
+    'create_beehive_view', 
+    'update_nectar_level', 
+    'update_queen_drone_simulation',
+    'initialize_comb_construction',
+    'update_comb_construction'
+]
 
 def create_beehive_view(fig, gs, worker_bee_count, drone_bees=4):
     """
